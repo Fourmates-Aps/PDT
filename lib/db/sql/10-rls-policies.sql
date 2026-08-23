@@ -1,0 +1,271 @@
+-- Row-Level Security policies.
+--
+-- WHY THESE LIVE IN SQL RATHER THAN IN THE DRIZZLE SCHEMA
+--
+-- `drizzle-kit push` creates policy OBJECTS but does not emit their USING /
+-- WITH CHECK expressions. A policy created that way has no predicate, and a
+-- predicate-less policy in Postgres permits every row — so pushing pgPolicy()
+-- declarations produced eleven tables with RLS "enabled" and zero isolation.
+--
+-- `drizzle-kit generate` does emit them, but this project applies schema with
+-- push, so the policies are defined here instead and applied by `npm run db:bootstrap`.
+-- This file is the single source of truth for authorisation. The Drizzle schema
+-- only turns RLS on (.enableRLS()).
+--
+-- Every statement is idempotent: run it as often as you like.
+--
+-- Depends on 00-auth-helpers.sql.
+
+-- ===========================================================================
+-- organisations
+-- ===========================================================================
+drop policy if exists organisations_select_own on public.organisations;
+create policy organisations_select_own on public.organisations
+  for select to authenticated
+  using (id = public.auth_org_id());
+
+drop policy if exists organisations_admin_all on public.organisations;
+create policy organisations_admin_all on public.organisations
+  for all to authenticated
+  using (public.auth_user_role() = 'admin')
+  with check (public.auth_user_role() = 'admin');
+
+-- ===========================================================================
+-- departments
+-- ===========================================================================
+drop policy if exists departments_select_own_org on public.departments;
+create policy departments_select_own_org on public.departments
+  for select to authenticated
+  using (organisation_id = public.auth_org_id());
+
+drop policy if exists departments_manage on public.departments;
+create policy departments_manage on public.departments
+  for all to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  )
+  with check (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  );
+
+-- ===========================================================================
+-- organisation_members
+-- ===========================================================================
+drop policy if exists organisation_members_select_own_org on public.organisation_members;
+create policy organisation_members_select_own_org on public.organisation_members
+  for select to authenticated
+  using (organisation_id = public.auth_org_id());
+
+drop policy if exists organisation_members_manage on public.organisation_members;
+create policy organisation_members_manage on public.organisation_members
+  for all to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  )
+  with check (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  );
+
+-- ===========================================================================
+-- products / product_variants — shared supplier master data.
+-- Readable by any signed-in user; writable only by platform staff.
+-- Per-tenant visibility is enforced through org_assortment, not here.
+-- ===========================================================================
+drop policy if exists products_select_authenticated on public.products;
+create policy products_select_authenticated on public.products
+  for select to authenticated
+  using (true);
+
+drop policy if exists products_admin_write on public.products;
+create policy products_admin_write on public.products
+  for all to authenticated
+  using (public.auth_user_role() = 'admin')
+  with check (public.auth_user_role() = 'admin');
+
+drop policy if exists product_variants_select_authenticated on public.product_variants;
+create policy product_variants_select_authenticated on public.product_variants
+  for select to authenticated
+  using (true);
+
+drop policy if exists product_variants_admin_write on public.product_variants;
+create policy product_variants_admin_write on public.product_variants
+  for all to authenticated
+  using (public.auth_user_role() = 'admin')
+  with check (public.auth_user_role() = 'admin');
+
+-- ===========================================================================
+-- org_assortment
+-- ===========================================================================
+drop policy if exists org_assortment_select_own_org on public.org_assortment;
+create policy org_assortment_select_own_org on public.org_assortment
+  for select to authenticated
+  using (organisation_id = public.auth_org_id());
+
+drop policy if exists org_assortment_manage on public.org_assortment;
+create policy org_assortment_manage on public.org_assortment
+  for all to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  )
+  with check (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  );
+
+-- ===========================================================================
+-- org_pricing — employees may read their org's prices, only platform staff set them.
+-- ===========================================================================
+drop policy if exists org_pricing_select_own_org on public.org_pricing;
+create policy org_pricing_select_own_org on public.org_pricing
+  for select to authenticated
+  using (organisation_id = public.auth_org_id());
+
+drop policy if exists org_pricing_manage on public.org_pricing;
+create policy org_pricing_manage on public.org_pricing
+  for all to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() = 'admin'
+  )
+  with check (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() = 'admin'
+  );
+
+-- ===========================================================================
+-- employee_quotas — an employee sees their own balance and cannot raise it.
+-- ===========================================================================
+drop policy if exists employee_quotas_select on public.employee_quotas;
+create policy employee_quotas_select on public.employee_quotas
+  for select to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and (
+      public.auth_user_role() in ('customer_admin', 'admin')
+      or member_id in (
+        select id from public.organisation_members
+        where user_id = auth.uid() and organisation_id = public.auth_org_id()
+      )
+    )
+  );
+
+drop policy if exists employee_quotas_manage on public.employee_quotas;
+create policy employee_quotas_manage on public.employee_quotas
+  for all to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  )
+  with check (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  );
+
+-- ===========================================================================
+-- orders
+-- ===========================================================================
+drop policy if exists orders_select on public.orders;
+create policy orders_select on public.orders
+  for select to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and (
+      public.auth_user_role() in ('customer_admin', 'admin', 'warehouse', 'key_account_manager')
+      or member_id in (
+        select id from public.organisation_members
+        where user_id = auth.uid() and organisation_id = public.auth_org_id()
+      )
+    )
+  );
+
+-- An order may only be placed against the caller's own membership. Without this,
+-- an employee could spend a colleague's clothing budget.
+drop policy if exists orders_insert_own on public.orders;
+create policy orders_insert_own on public.orders
+  for insert to authenticated
+  with check (
+    organisation_id = public.auth_org_id()
+    and member_id in (
+      select id from public.organisation_members
+      where user_id = auth.uid() and organisation_id = public.auth_org_id()
+    )
+  );
+
+drop policy if exists orders_update_elevated on public.orders;
+create policy orders_update_elevated on public.orders
+  for update to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin', 'warehouse', 'key_account_manager')
+  )
+  with check (organisation_id = public.auth_org_id());
+
+-- ===========================================================================
+-- order_lines
+-- ===========================================================================
+drop policy if exists order_lines_select on public.order_lines;
+create policy order_lines_select on public.order_lines
+  for select to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and order_id in (select id from public.orders where organisation_id = public.auth_org_id())
+  );
+
+drop policy if exists order_lines_write on public.order_lines;
+create policy order_lines_write on public.order_lines
+  for all to authenticated
+  using (organisation_id = public.auth_org_id())
+  with check (
+    organisation_id = public.auth_org_id()
+    and order_id in (select id from public.orders where organisation_id = public.auth_org_id())
+  );
+
+-- ===========================================================================
+-- approval_requests
+-- ===========================================================================
+drop policy if exists approval_requests_select on public.approval_requests;
+create policy approval_requests_select on public.approval_requests
+  for select to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and (
+      public.auth_user_role() in ('customer_admin', 'admin')
+      or requested_by in (
+        select id from public.organisation_members
+        where user_id = auth.uid() and organisation_id = public.auth_org_id()
+      )
+    )
+  );
+
+drop policy if exists approval_requests_insert on public.approval_requests;
+create policy approval_requests_insert on public.approval_requests
+  for insert to authenticated
+  with check (
+    organisation_id = public.auth_org_id()
+    and requested_by in (
+      select id from public.organisation_members
+      where user_id = auth.uid() and organisation_id = public.auth_org_id()
+    )
+  );
+
+-- An approver may not approve their own request.
+drop policy if exists approval_requests_decide on public.approval_requests;
+create policy approval_requests_decide on public.approval_requests
+  for update to authenticated
+  using (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+    and requested_by not in (
+      select id from public.organisation_members
+      where user_id = auth.uid() and organisation_id = public.auth_org_id()
+    )
+  )
+  with check (
+    organisation_id = public.auth_org_id()
+    and public.auth_user_role() in ('customer_admin', 'admin')
+  );

@@ -1,0 +1,81 @@
+{
+  "brand": "Profil Design Trading — Nordic Workwear",
+  "version": "1.0.0",
+  "note": "Ramps are hand-authored. The brand sync script's linear interpolation produced off-hue steps (yellow inside the orange ramp, black-collapsed neutrals) and must not be used to regenerate this file without review.",
+  "primitive": {
+    "color": {
+      "highvis": {
+        "50": { "$value": "#FFF3EC", "$type": "color" },
+        "100": { "$value": "#FFE1D2", "$type": "color" },
+        "200": { "$value": "#FFC4A8", "$type": "color" },
+        "300": { "$value": "#FF9F73", "$type": "color" },
+        "400": { "$value": "#FF8A4C", "$type": "color" },
+        "500": { "$value": "#F26522", "$type": "color" },
+        "600": { "$value": "#D9501B", "$type": "color" },
+        "700": { "$value": "#BC4318", "$type": "color" },
+        "800": { "$value": "#93340F", "$type": "color" },
+        "900": { "$value": "#6B250A", "$type": "color" }
+      },
+      "ink": {
+        "50": { "$value": "#F5F6F7", "$type": "color" },
+        "100": { "$value": "#E7E9EB", "$type": "color" },
+        "200": { "$value": "#CBD1D5", "$type": "color" },
+        "300": { "$value": "#98A3AA", "$type": "color" },
+        "400": { "$value": "#717E86", "$type": "color" },
+        "500": { "$value": "#5A666E", "$type": "color" },
+        "600": { "$value": "#414C53", "$type": "color" },
+        "700": { "$value": "#2C363D", "$type": "color" },
+        "800": { "$value": "#1A2126", "$type": "color" },
+        "900": { "$value": "#0E1214", "$type": "color" },
+        "950": { "$value": "#070A0B", "$type": "color" }
+      },
+      "bone": {
+        "50": { "$value": "#FBFAF7", "$type": "color" },
+        "100": { "$value": "#F4F2ED", "$type": "color" },
+        "200": { "$value": "#E7E4DC", "$type": "color" },
+        "300": { "$value": "#D5D0C4", "$type": "color" }
+      },
+      "status": {
+        "success": { "$value": "#1F7A4C", "$type": "color" },
+        "warning": { "$value": "#B26A00", "$type": "color" },
+        "error": { "$value": "#B3261E", "$type": "color" },
+        "info": { "$value": "#1D4E86", "$type": "color" }
+      }
+    }
+  },
+  "semantic": {
+    "color": {
+      "background": { "$value": "{primitive.color.bone.50}", "$type": "color" },
+      "surface": { "$value": "{primitive.color.bone.100}", "$type": "color" },
+      "border": { "$value": "{primitive.color.bone.200}", "$type": "color" },
+      "text-primary": { "$value": "{primitive.color.ink.800}", "$type": "color" },
+      "text-secondary": { "$value": "{primitive.color.ink.500}", "$type": "color" },
+      "inverse-surface": { "$value": "{primitive.color.ink.900}", "$type": "color" },
+      "inverse-text": { "$value": "{primitive.color.bone.50}", "$type": "color" },
+      "inverse-text-muted": { "$value": "{primitive.color.ink.300}", "$type": "color" },
+      "accent": { "$value": "{primitive.color.highvis.700}", "$type": "color" },
+      "accent-on-dark": { "$value": "{primitive.color.highvis.400}", "$type": "color" },
+      "accent-fill": { "$value": "{primitive.color.highvis.500}", "$type": "color" }
+    },
+    "contrast": {
+      "note": "Measured WCAG 2.1 ratios. Never place white text on accent-fill (#F26522) — 3.15:1, fails AA. Use ink-900 on accent-fill (5.97:1).",
+      "text-primary-on-background": "15.9:1",
+      "text-secondary-on-background": "5.65:1",
+      "white-on-accent": "5.31:1",
+      "accent-on-background": "5.09:1",
+      "ink900-on-accent-fill": "5.97:1",
+      "accent-on-dark-on-inverse-surface": "8.06:1"
+    }
+  },
+  "typography": {
+    "font": {
+      "display": { "$value": "Familjen Grotesk", "$type": "fontFamily" },
+      "body": { "$value": "Instrument Sans", "$type": "fontFamily" }
+    }
+  },
+  "radius": {
+    "sm": { "$value": "4px", "$type": "dimension" },
+    "md": { "$value": "8px", "$type": "dimension" },
+    "lg": { "$value": "14px", "$type": "dimension" }
+  }
+}

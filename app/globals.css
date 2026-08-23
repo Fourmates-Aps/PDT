@@ -1,26 +1,136 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   Profil Design Trading — "Nordic Workwear" design tokens
+   Source of truth: docs/brand-guidelines.md + assets/design-tokens.json
+   Every colour pairing used in the UI is WCAG 2.1 AA or better.
+   ============================================================ */
+
+@theme {
+  /* --- High-visibility accent (authentic to the EN 20471 range) --- */
+  --color-highvis-50: #fff3ec;
+  --color-highvis-100: #ffe1d2;
+  --color-highvis-200: #ffc4a8;
+  --color-highvis-300: #ff9f73;
+  --color-highvis-400: #ff8a4c; /* accent text on dark — 8.06:1 AAA */
+  --color-highvis-500: #f26522; /* fill on dark; ink text only — 5.97:1 AA */
+  --color-highvis-600: #d9501b;
+  --color-highvis-700: #bc4318; /* accent text on light 5.09:1; white-on 5.31:1 */
+  --color-highvis-800: #93340f;
+  --color-highvis-900: #6b250a;
+
+  /* --- Graphite ink --- */
+  --color-ink-50: #f5f6f7;
+  --color-ink-100: #e7e9eb;
+  --color-ink-200: #cbd1d5;
+  --color-ink-300: #98a3aa; /* muted text on dark — 7.31:1 AAA */
+  --color-ink-400: #717e86;
+  --color-ink-500: #5a666e; /* secondary text on light — 5.65:1 AA */
+  --color-ink-600: #414c53;
+  --color-ink-700: #2c363d;
+  --color-ink-800: #1a2126; /* body text — 15.9:1 AAA */
+  --color-ink-900: #0e1214; /* dark sections, primary button */
+  --color-ink-950: #070a0b;
+
+  /* --- Warm bone neutrals --- */
+  --color-bone-50: #fbfaf7; /* page background */
+  --color-bone-100: #f4f2ed; /* alternating surface */
+  --color-bone-200: #e7e4dc; /* hairline borders */
+  --color-bone-300: #d5d0c4;
+
+  /* --- Semantic --- */
+  --color-success: #1f7a4c;
+  --color-warning: #b26a00;
+  --color-error: #b3261e;
+  --color-info: #1d4e86;
+
+  /* --- Type --- */
+  --font-display: var(--font-familjen), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1.2;
+  --text-eyebrow--letter-spacing: 0.18em;
+  --text-eyebrow--font-weight: 600;
+
+  --text-display: clamp(2.375rem, 1.15rem + 5.4vw, 4.25rem);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.03em;
+
+  --text-h1: clamp(2rem, 1.3rem + 3vw, 3rem);
+  --text-h1--line-height: 1.08;
+  --text-h1--letter-spacing: -0.02em;
+
+  --text-h2: clamp(1.6875rem, 1.35rem + 1.5vw, 2.25rem);
+  --text-h2--line-height: 1.15;
+  --text-h2--letter-spacing: -0.015em;
+
+  --text-h3: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  --text-h3--line-height: 1.25;
+  --text-h3--letter-spacing: -0.01em;
+
+  --text-lead: clamp(1.0625rem, 1rem + 0.35vw, 1.1875rem);
+  --text-lead--line-height: 1.55;
+
+  /* --- Shape --- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  /* --- Rhythm --- */
+  --spacing-section: 3.5rem;
+  --spacing-section-lg: 6rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* The page commits to one deliberate light treatment. Backgrounds are painted
+   explicitly so a viewer's dark system theme cannot bleed through the design. */
+html {
+  background-color: var(--color-bone-50);
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-bone-50);
+  color: var(--color-ink-800);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+}
+
+/* Numerals in stats and prices should not wobble between values. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible, on-brand focus ring for keyboard users across the whole page. */
+:focus-visible {
+  outline: 2px solid var(--color-highvis-700);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background-color: var(--color-highvis-200);
+  color: var(--color-ink-900);
 }

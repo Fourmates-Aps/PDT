@@ -1,0 +1,230 @@
+import type { Dictionary } from "./da";
+
+/**
+ * English copy.
+ *
+ * Typed as `Dictionary`, so if the Danish source gains, loses or renames a key,
+ * this file fails the type check rather than silently falling out of sync.
+ */
+export const en: Dictionary = {
+  meta: {
+    title: "Profil Design Trading — corporate wear with your logo",
+    description:
+      "Workwear, corporate wear and business gifts with your logo. Employees order for themselves within the budget you set — you get oversight, a correct logo every time, and one invoice.",
+    langName: "English",
+    switchTo: "På dansk",
+    switchToAria: "Switch language to Danish",
+  },
+  nav: {
+    solution: "Solution",
+    how: "How it works",
+    range: "Range",
+    esg: "Sustainability",
+    contact: "Contact",
+    cta: "Request a quote",
+    openMenu: "Open menu",
+    skipToContent: "Skip to content",
+  },
+  hero: {
+    eyebrow: "Be your brand",
+    title: "Corporate wear with your logo — without the email thread.",
+    lead: "Workwear, corporate wear and business gifts in one place. Your employees order for themselves within the budget you set, and you get oversight, a correct logo every time, and one invoice.",
+    ctaPrimary: "Request a quote",
+    ctaSecondary: "See how it works",
+    figureLabel: "Left chest · embroidery · 80 × 35 mm · PMS 186 C",
+    figureCaption: "A logo specification travels with every single order.",
+  },
+  trust: {
+    items: [
+      { label: "Company reg.", value: "35657886" },
+      { label: "Showrooms", value: "Vejle · Billund · Fredericia · Skjern" },
+      { label: "Delivery", value: "2–4 working days" },
+      { label: "Prices", value: "Excl. VAT" },
+    ],
+  },
+  problem: {
+    eyebrow: "The problem",
+    title: "Corporate clothing turns into admin work fast.",
+    lead: "The more employees you have, the more time goes into tracking who got what — and what it cost.",
+    items: [
+      {
+        title: "Orders by email and phone",
+        body: "Orders sit scattered across inboxes. Nobody has the full picture of what was ordered, by whom, at what price.",
+      },
+      {
+        title: "Spreadsheets instead of budgets",
+        body: "With no per-employee cap and no approval step, the spend only becomes visible when the invoice arrives.",
+      },
+      {
+        title: "The logo lands differently each time",
+        body: "Placement and method get agreed order by order. The mistake surfaces once the garment is already printed.",
+      },
+      {
+        title: "Documents get keyed in by hand",
+        body: "Every delivery is posted manually. Reconciliation takes time, and something is always missing.",
+      },
+    ],
+  },
+  features: {
+    eyebrow: "The platform",
+    title: "The administrative part — put into a system.",
+    lead: "One platform for ordering, logo handling, production and invoicing. You set the rules; your employees handle the rest themselves.",
+    items: [
+      {
+        title: "Your own employee shop",
+        body: "Each employee signs in and sees only the range you approved, at your agreed prices. Allocate points or an annual amount.",
+      },
+      {
+        title: "Budgets and approvals",
+        body: "Set a cap per order. Anything above it routes automatically to the line manager and purchasing before it enters production.",
+      },
+      {
+        title: "A design manual for the logo",
+        body: "Placement, method, size in millimetres and PMS colours are fixed per customer. The print shop never has to guess.",
+      },
+      {
+        title: "Proofing before production",
+        body: "See the logo positioned on the garment and approve a visual proof before anything is printed or embroidered.",
+      },
+      {
+        title: "Production and shipping",
+        body: "Follow the order from print and embroidery through packing to dispatch with GLS and track & trace.",
+      },
+      {
+        title: "Invoicing into e-conomic",
+        body: "Company purchases are consolidated per customer and sent to e-conomic as a single invoice. Personal purchases stay entirely off the company account.",
+      },
+    ],
+  },
+  how: {
+    eyebrow: "How it works",
+    title: "Three steps from agreement to parcel.",
+    steps: [
+      {
+        n: "01",
+        title: "We set up the shop",
+        body: "We create your company, put the range together with you and register your logo as a fixed specification. You approve prices and budget limits.",
+      },
+      {
+        n: "02",
+        title: "Employees order for themselves",
+        body: "They sign in, pick their size and order within their allowance. Anything beyond it goes to you for approval.",
+      },
+      {
+        n: "03",
+        title: "We produce and ship",
+        body: "The logo is applied to your design manual, the order is packed and shipped with GLS. The invoice lands in e-conomic.",
+      },
+    ],
+  },
+  suppliers: {
+    eyebrow: "Range",
+    title: "The brands we supply.",
+    lead: "We supply workwear, corporate wear and business gifts from brands including these. The range is put together around your needs, your industry and your budget.",
+    brands: [
+      "Mascot",
+      "Fristads Kansas",
+      "Snickers",
+      "Engel",
+      "ID Identity",
+      "Cottover",
+      "Clique",
+      "TEE JAYS",
+      "You",
+      "Stormtech",
+      "Premier",
+      "Samsonite",
+    ],
+    footnote:
+      "Brand availability varies by category and lead time. We advise on what suits the job.",
+  },
+  esg: {
+    eyebrow: "CO₂ & ESG",
+    title: "Figures you can use in your ESG reporting.",
+    body: "Where the supplier discloses it, we show CO₂ per item and total it for the whole order. You can pull an annual summary of your corporate wear footprint.",
+    disclaimer:
+      "Figures are indicative and based on suppliers' own data. Coverage varies between brands, and some suppliers do not disclose it at all — those items are shown without a figure rather than with a guess.",
+    points: [
+      "CO₂ per item, where data exists",
+      "Total footprint per order",
+      "Annual summary for reporting",
+    ],
+  },
+  lead: {
+    eyebrow: "Contact",
+    title: "Request a quote for your corporate wear.",
+    body: "Tell us briefly what you need and we will come back within one working day with a proposal.",
+    fields: {
+      company: "Company",
+      name: "Contact person",
+      email: "Email",
+      phone: "Phone",
+      phoneOptional: "optional",
+      employees: "Number of employees",
+      message: "What do you need?",
+    },
+    messagePlaceholder:
+      "For example: 25 fitters need workwear with a logo on chest and back.",
+    submit: "Send enquiry",
+    sending: "Sending…",
+    successTitle: "Thank you — we have received your enquiry.",
+    successBody: "We will come back to you within one working day.",
+    errorTitle: "The enquiry was not sent.",
+    errorGeneric: "Something went wrong along the way. Try again, or give us a call.",
+    errors: {
+      company: "Enter the company name.",
+      name: "Tell us who to contact.",
+      email: "Enter an email we can reply to.",
+      employees: "Enter a number of employees.",
+    },
+    privacy:
+      "We use these details only to answer your enquiry. We do not pass them on.",
+  },
+  footer: {
+    tagline: "Workwear, corporate wear and business gifts with your logo.",
+    showroomsTitle: "Showrooms",
+    showrooms: ["Vejle", "Billund", "Fredericia", "Skjern"],
+    contactTitle: "Contact",
+    phoneLabel: "Phone",
+    phone: "22 56 79 80",
+    company: "Profil Design Trading ApS",
+    cvr: "Company reg. 35657886",
+    rights: "All rights reserved.",
+    pricesNote: "All prices are excluding VAT.",
+  },
+  auth: {
+    login: {
+      title: "Sign in",
+      lead: "Sign in to your company shop.",
+      email: "Email",
+      password: "Password",
+      submit: "Sign in",
+      submitting: "Signing in…",
+      // Deliberately does not reveal whether the email exists — that would let
+      // anyone probe which addresses are registered.
+      invalid: "That email and password do not match.",
+      generic: "Something went wrong. Please try again.",
+      needAccount:
+        "No sign-in yet? Your company administrator creates your account.",
+      backToSite: "← Back to the site",
+    },
+    dashboard: {
+      title: "Overview",
+      signedInAs: "Signed in as",
+      role: "Role",
+      organisation: "Company",
+      noRole: "No role assigned yet",
+      noOrg: "Not linked to a company yet",
+      pendingSetup:
+        "Your account exists but is not yet linked to a company and a role. Contact your administrator.",
+      signOut: "Sign out",
+    },
+    roles: {
+      employee: "Employee",
+      customer_admin: "Customer admin",
+      key_account_manager: "Key Account Manager",
+      warehouse: "Warehouse",
+      admin: "Administrator",
+    },
+  },
+};
