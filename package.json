@@ -13,7 +13,8 @@
     "db:setup": "npm run db:migrate && npm run db:bootstrap && npm run db:check",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/db-migrate.mjs",
-    "db:baseline": "node scripts/db-migrate.mjs --baseline"
+    "db:baseline": "node scripts/db-migrate.mjs --baseline",
+    "seed:admin": "node scripts/seed-admin.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
