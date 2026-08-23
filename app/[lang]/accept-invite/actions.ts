@@ -12,10 +12,10 @@ export type AcceptState = {
 /**
  * Sets the invited user's password and activates their membership.
  *
- * The password is changed through the CALLER'S OWN session — established by the
- * invite link's code exchange in /auth/callback — not with the service key. That
- * way this action can only ever change the password of whoever is signed in, and
- * a stray call cannot reset somebody else's.
+ * The password is changed through the CALLER'S OWN session — established when the
+ * accept-invite page turned the emailed token into a session — not with the
+ * service key. That way this action can only ever change the password of whoever
+ * is signed in, and a stray call cannot reset somebody else's.
  */
 export async function acceptInviteAction(
   _prev: AcceptState,

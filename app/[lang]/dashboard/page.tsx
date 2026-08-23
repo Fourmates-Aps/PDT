@@ -78,6 +78,18 @@ export default async function DashboardPage() {
         </div>
       </dl>
 
+      {/* A KAM's landing page is this one, so it has to offer the one thing
+          they are here to do — otherwise onboarding is unreachable by anyone
+          who does not already know the URL. */}
+      {user.role === ROLES.KEY_ACCOUNT_MANAGER ? (
+        <a
+          href={`/${locale}/dashboard/kam/onboarding`}
+          className="mt-8 inline-block rounded-md bg-ink-900 px-5 py-2.5 text-sm font-semibold text-bone-50 transition-colors hover:bg-ink-700"
+        >
+          {dict.auth.orgs.title}
+        </a>
+      ) : null}
+
       <form action="/auth/signout" method="post" className="mt-8">
         <input type="hidden" name="locale" value={locale} />
         <button

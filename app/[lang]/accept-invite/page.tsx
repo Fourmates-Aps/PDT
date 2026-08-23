@@ -1,26 +1,20 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getDictionary, getLocale } from "@/lib/i18n";
-import { getSessionUser } from "@/lib/supabase/server";
-import { AcceptInviteForm } from "@/components/auth/accept-invite-form";
+import { AcceptInviteClient } from "@/components/auth/accept-invite-client";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
- * Where an invite link lands, after /auth/callback has exchanged the code for a
- * session. Reaching this page already means the invite token was valid — the
- * form only sets a password.
+ * Where an invite link lands.
+ *
+ * There is deliberately NO server-side session check here. Supabase returns the
+ * session in the URL hash, which never reaches the server, so `getSessionUser()`
+ * is empty on this first render for every legitimate invitee — gating on it
+ * bounced all of them to /login. The client component below reads the fragment,
+ * establishes the session and only then shows the password form.
  */
 export default async function AcceptInvitePage() {
-  const [dict, locale, user] = await Promise.all([
-    getDictionary(),
-    getLocale(),
-    getSessionUser(),
-  ]);
-
-  // No session means the link was never valid, has expired, or was already used.
-  if (!user) redirect(`/${locale}/login`);
-
+  const [dict, locale] = await Promise.all([getDictionary(), getLocale()]);
   const t = dict.auth.accept;
 
   return (
@@ -33,9 +27,8 @@ export default async function AcceptInvitePage() {
           {t.title}
         </h1>
         <p className="mt-2 text-[15px] text-ink-500">{t.lead}</p>
-        <p className="mt-1 text-sm text-ink-500">{user.email}</p>
 
-        <AcceptInviteForm dict={t} locale={locale} />
+        <AcceptInviteClient dict={t} locale={locale} />
       </div>
     </main>
   );

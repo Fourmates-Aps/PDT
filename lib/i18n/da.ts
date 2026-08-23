@@ -273,6 +273,10 @@ export const da = {
       submitting: "Gemmer…",
       tooShort: "Adgangskoden skal være mindst 8 tegn.",
       mismatch: "De to adgangskoder er ikke ens.",
+      validating: "Bekræfter din invitation…",
+      invalidLink: "Linket kunne ikke bekræftes. Bed din administrator om en ny invitation.",
+      backToLogin: "Gå til login",
+      welcome: "Du er inviteret som",
       expired:
         "Linket er udløbet eller allerede brugt. Bed din administrator om en ny invitation.",
     },

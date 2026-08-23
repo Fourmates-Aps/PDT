@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Local credential notes. Never commit: secrets in git history are effectively
+# permanent and survive any later deletion of the file.
+CREDS.md
+
 # vercel
 .vercel
 

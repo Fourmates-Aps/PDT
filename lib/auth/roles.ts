@@ -34,6 +34,10 @@ export type AppMetadata = {
  * Longest match wins, so `/dashboard/admin` is checked before `/dashboard`.
  */
 export const ROUTE_ROLES: Record<string, readonly Role[]> = {
+  // Platform-only. Deliberately NOT widened to include KAMs: customer
+  // onboarding lives at /dashboard/kam/onboarding instead, so a KAM never
+  // gains access to pricing, economy or the other admin surfaces that will
+  // land under this prefix.
   "/dashboard/admin": [ROLES.ADMIN],
   "/dashboard/warehouse": [ROLES.WAREHOUSE, ROLES.ADMIN],
   "/dashboard/kam": [ROLES.KEY_ACCOUNT_MANAGER, ROLES.ADMIN],

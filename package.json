@@ -16,7 +16,8 @@
     "db:baseline": "node scripts/db-migrate.mjs --baseline",
     "seed:admin": "node scripts/seed-admin.mjs",
     "seed:demo": "node scripts/seed-demo.mjs",
-    "seed:catalogue": "node scripts/seed-catalogue.mjs"
+    "seed:catalogue": "node scripts/seed-catalogue.mjs",
+    "verify:phase1": "node scripts/verify-phase1.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -273,6 +273,10 @@ export const en: Dictionary = {
       submitting: "Saving…",
       tooShort: "The password must be at least 8 characters.",
       mismatch: "The two passwords do not match.",
+      validating: "Confirming your invitation…",
+      invalidLink: "This link could not be confirmed. Ask your administrator for a new invite.",
+      backToLogin: "Go to sign in",
+      welcome: "You have been invited as",
       expired:
         "This link has expired or was already used. Ask your administrator for a new invite.",
     },

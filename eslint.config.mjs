@@ -13,6 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    // Node CLI tooling, not application code: seeding, migrations and the
+    // Phase 1 verification harness. `cond ? pass(...) : fail(...)` reads well in
+    // a long list of checks and is intentional there.
+    files: ["scripts/**/*.mjs"],
+    rules: {
+      "@typescript-eslint/no-unused-expressions": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

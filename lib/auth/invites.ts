@@ -43,9 +43,19 @@ export async function inviteMember(params: {
   const admin = createAdminClient();
   const email = params.email.trim().toLowerCase();
 
-  const redirectTo = `${siteUrl()}/auth/callback?next=${encodeURIComponent(
-    `/${params.locale}/accept-invite`,
-  )}`;
+  /*
+   * Point straight at the accept-invite PAGE, not the /auth/callback route.
+   *
+   * Supabase verifies the emailed link on its own /auth/v1/verify endpoint and
+   * then 303s here with the session in the URL *hash*:
+   *   /da/accept-invite#access_token=…&refresh_token=…&type=invite
+   *
+   * A hash fragment is never sent to the server, so a Route Handler physically
+   * cannot read it — the old /auth/callback target saw no `code`, found nothing
+   * to exchange, and redirected every invitee to the login page. The page below
+   * picks the tokens up on the client instead.
+   */
+  const redirectTo = `${siteUrl()}/${params.locale}/accept-invite`;
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo,
