@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState, type ReactNode } from "react";
-import type { ActionState } from "@/app/[lang]/dashboard/actions";
+
+/** Structural shape shared by every Server Action in the dashboard. */
+export type ActionState = { ok: boolean; message?: string } | null;
 
 type Action = (
   prev: ActionState,

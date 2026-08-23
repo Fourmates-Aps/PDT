@@ -36,6 +36,8 @@ export const products = pgTable(
     supplierSku: text("supplier_sku").notNull(),
     brand: text("brand").notNull(),
     name: text("name").notNull(),
+    /** URL segment for /shop/[slug]. Stable even if the display name changes. */
+    slug: text("slug").notNull(),
     nameEn: text("name_en"),
     category: text("category").notNull(),
     subcategory: text("subcategory"),
@@ -60,6 +62,7 @@ export const products = pgTable(
   },
   (t) => [
     uniqueIndex("products_supplier_sku_key").on(t.supplierId, t.supplierSku),
+    uniqueIndex("products_slug_key").on(t.slug),
     index("products_category_idx").on(t.category),
   ],
 ).enableRLS();

@@ -10,7 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { authUsers } from "drizzle-orm/supabase";
-import { budgetPeriod, memberRole } from "./enums";
+import { budgetPeriod, displayMode, memberRole } from "./enums";
 
 /*
  * AUTHORISATION IS NOT DEFINED IN THIS FILE.
@@ -47,6 +47,30 @@ export const organisations = pgTable(
       .notNull()
       .default("35"),
     plan: text("plan").notNull().default("standard"),
+
+    /* --- Customer-configurable settings (kunde-admin → Indstillinger) --- */
+
+    /** Employees see kroner, or an abstract point balance. */
+    displayMode: displayMode("display_mode").notNull().default("price"),
+    /** Default annual clothing allowance applied to new employees. */
+    defaultAllowanceDkk: numeric("default_allowance_dkk", {
+      precision: 10,
+      scale: 2,
+    })
+      .notNull()
+      .default("1500"),
+    /** Orders above this go through the approval chain. */
+    orderApprovalLimitDkk: numeric("order_approval_limit_dkk", {
+      precision: 10,
+      scale: 2,
+    })
+      .notNull()
+      .default("1000"),
+    /** Whether employees may buy personal items alongside company wear. */
+    allowPersonalPurchases: boolean("allow_personal_purchases")
+      .notNull()
+      .default(true),
+
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -11,6 +11,12 @@ export const memberRole = pgEnum("member_role", [
 
 export const budgetPeriod = pgEnum("budget_period", ["annual", "monthly"]);
 
+/**
+ * Whether employees see kroner or an abstract point balance.
+ * The prototype's kunde-admin can flip this per customer.
+ */
+export const displayMode = pgEnum("display_mode", ["price", "points"]);
+
 export const orderStatus = pgEnum("order_status", [
   "draft",
   "pending_approval",

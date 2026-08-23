@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 /* ============================================================
    Profil Design Trading — "Nordic Workwear" design tokens
@@ -72,18 +76,124 @@
   --text-lead: clamp(1.0625rem, 1rem + 0.35vw, 1.1875rem);
   --text-lead--line-height: 1.55;
 
-  /* --- Shape --- */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 14px;
-
   /* --- Rhythm --- */
   --spacing-section: 3.5rem;
   --spacing-section-lg: 6rem;
 }
 
-/* The page commits to one deliberate light treatment. Backgrounds are painted
-   explicitly so a viewer's dark system theme cannot bleed through the design. */
+/* ============================================================
+   shadcn/ui bridge
+   ------------------------------------------------------------
+   shadcn components are written against semantic names
+   (--background, --primary, --sidebar…). Rather than let its default
+   grey palette sit alongside ours — two competing systems in one app —
+   every one of those names is mapped onto a Nordic Workwear token here.
+   Change a colour in the block above and shadcn follows automatically.
+   ============================================================ */
+
+:root {
+  --radius: 0.875rem; /* 14px, matching the card radius used on the site */
+
+  --background: var(--color-bone-50);
+  --foreground: var(--color-ink-800);
+
+  --card: #ffffff;
+  --card-foreground: var(--color-ink-800);
+  --popover: #ffffff;
+  --popover-foreground: var(--color-ink-800);
+
+  /* Primary is graphite, not the accent: the accent is a 5% highlight and
+     would be shouting if every button wore it. See brand guidelines §1. */
+  --primary: var(--color-ink-900);
+  --primary-foreground: var(--color-bone-50);
+
+  --secondary: var(--color-bone-100);
+  --secondary-foreground: var(--color-ink-800);
+
+  --muted: var(--color-bone-100);
+  --muted-foreground: var(--color-ink-500);
+
+  /* Hover/selected wash — warm, from the accent's lightest step. */
+  --accent: var(--color-highvis-50);
+  --accent-foreground: var(--color-ink-900);
+
+  --destructive: var(--color-error);
+  --destructive-foreground: #ffffff;
+
+  --border: var(--color-bone-200);
+  --input: var(--color-bone-300);
+  --ring: var(--color-highvis-700);
+
+  --chart-1: var(--color-highvis-500);
+  --chart-2: var(--color-ink-700);
+  --chart-3: var(--color-highvis-300);
+  --chart-4: var(--color-ink-400);
+  --chart-5: var(--color-bone-300);
+
+  /* The sidebar is the page's dark anchor, as on the marketing site. */
+  --sidebar: var(--color-ink-900);
+  --sidebar-foreground: var(--color-bone-50);
+  --sidebar-primary: var(--color-highvis-500);
+  --sidebar-primary-foreground: var(--color-ink-900);
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: var(--color-bone-50);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: var(--color-highvis-400);
+}
+
+@theme inline {
+  /* shadcn reads these; they point at the mapped values above. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* shadcn's font hooks. Its generated block left --font-sans pointing at
+     itself, which resolves to nothing — these give it our real faces. */
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-familjen), ui-sans-serif, system-ui, sans-serif;
+
+  /* Declared AFTER shadcn's calc()-derived scale so the site's own radii win.
+     Without this, cards on the landing page silently change shape. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+}
+
+/* The app commits to one deliberate light treatment, as the marketing site
+   does. No .dark palette is defined: a half-designed dark mode is worse than
+   none, and shadcn's default greys would clash with the warm bone neutrals.
+   The `dark:` variant still exists if a designed dark theme is added later. */
+
 html {
   background-color: var(--color-bone-50);
   scroll-behavior: smooth;
@@ -133,4 +243,10 @@ h4 {
 ::selection {
   background-color: var(--color-highvis-200);
   color: var(--color-ink-900);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 }

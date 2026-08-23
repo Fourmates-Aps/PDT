@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { getSessionUser } from "@/lib/supabase/server";
+import { ROLES } from "@/lib/auth/roles";
 
 export async function generateMetadata(): Promise<Metadata> {
   const dict = await getDictionary();
@@ -25,6 +26,15 @@ export default async function DashboardPage() {
    * the data they protect.
    */
   if (!user) redirect(`/${locale}/login`);
+
+  // Roles with a home of their own go straight there; this page is the fallback
+  // for accounts that are signed in but not yet attached to an organisation.
+  if (
+    (user.role === ROLES.CUSTOMER_ADMIN || user.role === ROLES.ADMIN) &&
+    user.organisationId
+  ) {
+    redirect(`/${locale}/dashboard/customer`);
+  }
 
   const d = dict.auth.dashboard;
   const roleLabel = user.role ? dict.auth.roles[user.role] : null;
