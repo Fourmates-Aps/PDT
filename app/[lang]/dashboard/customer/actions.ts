@@ -257,6 +257,21 @@ export async function decideApprovalAction(
       })
       .where(eq(approvalRequests.id, request.id));
 
+    const [order] = await db
+      .select({
+        id: orders.id,
+        memberId: orders.memberId,
+        accountAmountDkk: orders.accountAmountDkk,
+      })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, request.orderId),
+          eq(orders.organisationId, organisationId),
+        ),
+      )
+      .limit(1);
+
     await db
       .update(orders)
       .set({
@@ -269,6 +284,27 @@ export async function decideApprovalAction(
           eq(orders.organisationId, organisationId),
         ),
       );
+
+    // Checkout reserves the allowance when the order is placed, so a rejection
+    // has to give it back — otherwise the employee is charged budget for an
+    // order that will never ship. Floored at zero so a double-reject or a
+    // manual adjustment can never push used_dkk negative.
+    if (decision === "rejected" && order?.memberId) {
+      const released = Number(order.accountAmountDkk);
+      if (released > 0) {
+        await db
+          .update(employeeQuotas)
+          .set({
+            usedDkk: sql`greatest(0, ${employeeQuotas.usedDkk} - ${released.toFixed(2)})`,
+          })
+          .where(
+            and(
+              eq(employeeQuotas.memberId, order.memberId),
+              eq(employeeQuotas.organisationId, organisationId),
+            ),
+          );
+      }
+    }
 
     revalidate(formData, "/approvals");
     revalidate(formData, "");

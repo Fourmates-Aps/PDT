@@ -39,7 +39,12 @@ export const ROUTE_ROLES: Record<string, readonly Role[]> = {
   "/dashboard/kam": [ROLES.KEY_ACCOUNT_MANAGER, ROLES.ADMIN],
   "/dashboard/customer": [ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
   "/dashboard": ALL_ROLES,
+  // The employee-facing shop. Customer admins and platform staff can reach it
+  // too, so they can see exactly what their people see.
   "/shop": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
+  "/cart": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
+  "/checkout": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
+  "/orders": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
 };
 
 /** Roles permitted on `path`, or null when the path is public. */

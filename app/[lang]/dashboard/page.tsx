@@ -36,6 +36,11 @@ export default async function DashboardPage() {
     redirect(`/${locale}/dashboard/customer`);
   }
 
+  // An employee has no dashboard — their home is the shop.
+  if (user.role === ROLES.EMPLOYEE && user.organisationId) {
+    redirect(`/${locale}/shop`);
+  }
+
   const d = dict.auth.dashboard;
   const roleLabel = user.role ? dict.auth.roles[user.role] : null;
   const incomplete = !user.role || !user.organisationId;
