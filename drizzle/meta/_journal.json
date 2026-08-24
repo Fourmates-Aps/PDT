@@ -22,6 +22,13 @@
       "when": 1787489684473,
       "tag": "0002_nifty_human_fly",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787564494962,
+      "tag": "0003_heavy_hemingway",
+      "breakpoints": true
     }
   ]
 }

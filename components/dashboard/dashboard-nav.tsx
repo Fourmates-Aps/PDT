@@ -8,7 +8,11 @@ import {
   Gauge,
   Menu,
   Package,
+  PlusCircle,
+  Printer,
   Settings,
+  Tag,
+  Truck,
   Users,
   Wallet,
 } from "lucide-react";
@@ -24,6 +28,10 @@ const ICONS = {
   check: CheckCircle2,
   package: Package,
   settings: Settings,
+  tag: Tag,
+  plus: PlusCircle,
+  printer: Printer,
+  truck: Truck,
 } satisfies Record<IconName, React.ComponentType<{ className?: string }>>;
 
 function NavList({

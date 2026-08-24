@@ -17,6 +17,7 @@
     "seed:admin": "node scripts/seed-admin.mjs",
     "seed:demo": "node scripts/seed-demo.mjs",
     "seed:catalogue": "node scripts/seed-catalogue.mjs",
+    "seed:suppliers": "node scripts/seed-suppliers.mjs",
     "verify:phase1": "node scripts/verify-phase1.mjs"
   },
   "dependencies": {

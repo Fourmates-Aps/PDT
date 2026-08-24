@@ -8,6 +8,7 @@ import { ProductImage } from "./product-image";
 import { priceCart, type CartSummary } from "@/app/[lang]/(shop)/actions";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/skeleton";
+import { describeLogos } from "@/lib/shop/logo";
 
 export function CartView({
   dict,
@@ -16,7 +17,7 @@ export function CartView({
   dict: Dictionary["shop"];
   locale: Locale;
 }) {
-  const { items, ready, setQty, remove } = useCart();
+  const { items, ready, setQty, remove, removeVariant } = useCart();
   const [summary, setSummary] = useState<CartSummary | null>(null);
   const [pending, startTransition] = useTransition();
   const t = dict.cart;
@@ -24,7 +25,16 @@ export function CartView({
   const money = new Intl.NumberFormat(locale === "da" ? "da-DK" : "en-GB", {
     maximumFractionDigits: 0,
   });
-  const kr = (n: number | string) => `${money.format(Number(n))} kr.`;
+  // Points mode hides kroner entirely; 1 point maps to 1 DKK.
+  const amount = (n: number | string) =>
+    summary?.displayMode === "points"
+      ? `${money.format(Math.round(Number(n)))} ${dict.allowance.points}`
+      : `${money.format(Number(n))} kr.`;
+
+  const logoLabels = {
+    placements: dict.logo.placements,
+    methods: dict.logo.methods,
+  };
 
   // Every price shown here is computed server-side from org_pricing; the client
   // only ever contributes variant ids and quantities.
@@ -40,8 +50,8 @@ export function CartView({
   // badge count matches what checkout will actually accept.
   useEffect(() => {
     if (!summary?.droppedVariantIds.length) return;
-    for (const id of summary.droppedVariantIds) remove(id);
-  }, [summary, remove]);
+    for (const id of summary.droppedVariantIds) removeVariant(id);
+  }, [summary, removeVariant]);
 
   if (!ready || (!summary && pending)) {
     return (
@@ -71,7 +81,7 @@ export function CartView({
       <ul className="flex flex-col gap-3">
         {summary.lines.map((l) => (
           <li
-            key={l.variantId}
+            key={l.lineKey}
             className="flex gap-4 rounded-lg border border-border bg-card p-3 sm:p-4"
           >
             <Link
@@ -97,10 +107,18 @@ export function CartView({
                   <p className="mt-0.5 text-xs text-ink-500">
                     {[l.colourName, l.size].filter(Boolean).join(" · ")}
                   </p>
+                  {l.logos.length > 0 ? (
+                    <p className="mt-1 text-xs text-highvis-700">
+                      {describeLogos(l.logos, logoLabels)}
+                      {l.embellishment > 0
+                        ? ` · + ${amount(l.embellishment)}`
+                        : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
-                  onClick={() => remove(l.variantId)}
+                  onClick={() => remove(l.lineKey)}
                   aria-label={`${t.remove} ${l.productName}`}
                   className="shrink-0 rounded-sm p-1.5 text-ink-400 transition-colors hover:text-error"
                 >
@@ -112,7 +130,7 @@ export function CartView({
                 <div className="flex items-center gap-1 rounded-md border border-border">
                   <button
                     type="button"
-                    onClick={() => setQty(l.variantId, l.qty - 1)}
+                    onClick={() => setQty(l.lineKey, l.qty - 1)}
                     aria-label="-"
                     className="flex size-8 items-center justify-center text-ink-700 transition-colors hover:bg-secondary"
                   >
@@ -123,7 +141,7 @@ export function CartView({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setQty(l.variantId, l.qty + 1)}
+                    onClick={() => setQty(l.lineKey, l.qty + 1)}
                     aria-label="+"
                     className="flex size-8 items-center justify-center text-ink-700 transition-colors hover:bg-secondary"
                   >
@@ -132,7 +150,7 @@ export function CartView({
                 </div>
 
                 <span className="tabular text-sm font-bold text-ink-900">
-                  {kr(l.lineTotal)}
+                  {amount(l.lineTotal)}
                 </span>
               </div>
             </div>
@@ -144,7 +162,7 @@ export function CartView({
         <div className="flex items-baseline justify-between">
           <span className="font-semibold text-ink-900">{t.subtotal}</span>
           <span className="tabular text-xl font-bold text-ink-900">
-            {kr(summary.total)}
+            {amount(summary.total)}
           </span>
         </div>
 

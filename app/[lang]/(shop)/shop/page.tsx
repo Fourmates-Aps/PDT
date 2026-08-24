@@ -2,11 +2,20 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { getSessionUser } from "@/lib/supabase/server";
-import { listShopCategories, listShopProducts } from "@/lib/db/queries/shop";
+import {
+  getAllowanceSummary,
+  getLastOrderForReorder,
+  getMember,
+  listLastOrderedSizes,
+  listShopCategories,
+  listShopProducts,
+} from "@/lib/db/queries/shop";
 import { ProductImage } from "@/components/shop/product-image";
+import { AllowanceBar } from "@/components/shop/allowance-bar";
+import { ReorderStrip } from "@/components/shop/reorder-strip";
 import { PageHeader, EmptyState } from "@/components/dashboard/primitives";
 import { Badge } from "@/components/ui/badge";
-import { formatMoney } from "@/lib/format";
+import { formatAllowance } from "@/lib/format";
 
 export function generateMetadata() {
   return pageMetadata((d) => d.shop.grid.title);
@@ -37,9 +46,16 @@ export default async function ShopPage({
   }
 
   const active = params.kategori;
-  const [categories, items] = await Promise.all([
+  const member = user ? await getMember(user.id, organisationId) : null;
+
+  const [categories, items, allowance, lastOrder, lastSizes] = await Promise.all([
     listShopCategories(organisationId),
     listShopProducts(organisationId, active),
+    getAllowanceSummary(organisationId, member?.id ?? null),
+    member ? getLastOrderForReorder(organisationId, member.id) : null,
+    member
+      ? listLastOrderedSizes(organisationId, member.id)
+      : new Map<string, string>(),
   ]);
 
   const base = `/${locale}/shop`;
@@ -47,6 +63,20 @@ export default async function ShopPage({
   return (
     <>
       <PageHeader title={t.title} lead={t.lead} />
+
+      <AllowanceBar
+        summary={allowance}
+        dict={dict.shop.allowance}
+        locale={locale}
+      />
+
+      {lastOrder ? (
+        <ReorderStrip
+          orderNumber={lastOrder.orderNumber}
+          lines={lastOrder.lines}
+          dict={dict.shop.reorder}
+        />
+      ) : null}
 
       {/* Horizontally scrollable on phones rather than wrapping into four rows
           of chips that push the products below the fold. */}
@@ -90,6 +120,7 @@ export default async function ShopPage({
             {items.map((p) => {
               const out = p.stockQty <= 0;
               const low = !out && p.stockQty < 15;
+              const lastSize = lastSizes.get(p.id);
               return (
                 <li key={p.id}>
                   <Link
@@ -127,12 +158,24 @@ export default async function ShopPage({
                             <span className="text-xs font-normal text-ink-500">
                               {t.from}{" "}
                             </span>
-                            {formatMoney(locale, p.fromPrice)}
+                            {/* Points mode hides kroner entirely — the
+                                customer chose to show an abstract balance. */}
+                            {formatAllowance(
+                              locale,
+                              p.fromPrice,
+                              allowance.displayMode,
+                              dict.shop.allowance.points,
+                            )}
                           </p>
                         ) : null}
                         {p.co2Available && p.co2Kg ? (
                           <p className="tabular mt-1 text-xs text-success">
                             {Number(p.co2Kg).toFixed(1).replace(".", ",")} kg CO₂e
+                          </p>
+                        ) : null}
+                        {lastSize ? (
+                          <p className="mt-2 inline-block rounded-sm bg-highvis-50 px-2 py-0.5 text-[11px] font-semibold text-highvis-700">
+                            {t.lastOrdered}: {lastSize}
                           </p>
                         ) : null}
                       </div>

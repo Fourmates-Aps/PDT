@@ -3,11 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { getSessionUser } from "@/lib/supabase/server";
-import { getShopProduct } from "@/lib/db/queries/shop";
+import {
+  getAllowanceSummary,
+  getMember,
+  getShopProduct,
+  listLastOrderedSizes,
+} from "@/lib/db/queries/shop";
 import { ProductImage } from "@/components/shop/product-image";
 import { VariantPicker } from "@/components/shop/variant-picker";
 import { EmptyState } from "@/components/dashboard/primitives";
 import { formatDate } from "@/lib/format";
+import { parseMeasurements, recommendSize } from "@/lib/shop/sizing";
 
 export async function generateMetadata({
   params,
@@ -55,6 +61,29 @@ export default async function ProductPage({
   const priced = variants.filter((v) => v.priceDkk !== null);
   const stockUpdated = variants.find((v) => v.stockUpdatedAt)?.stockUpdatedAt;
 
+  const member = await getMember(user.id, organisationId);
+  const [allowance, lastSizes] = await Promise.all([
+    getAllowanceSummary(organisationId, member?.id ?? null),
+    member
+      ? listLastOrderedSizes(organisationId, member.id)
+      : new Map<string, string>(),
+  ]);
+
+  // Size history first, measurements second — see lib/shop/sizing.ts.
+  const recommended = recommendSize({
+    lastOrderedSize: lastSizes.get(product.id),
+    measurements: parseMeasurements(member?.measurements),
+    available: [
+      ...new Set(
+        priced
+          .filter((v) => v.stockQty > 0 && v.size)
+          .map((v) => v.size as string),
+      ),
+    ],
+  });
+
+  const trust = t.trust;
+
   return (
     <>
       <Link
@@ -98,9 +127,30 @@ export default async function ProductPage({
                 priceDkk: v.priceDkk,
               }))}
               dict={t}
+              logoDict={dict.shop.logo}
               locale={locale}
+              displayMode={allowance.displayMode}
+              pointsLabel={dict.shop.allowance.points}
+              recommended={recommended}
+              sizeGuideHref={`/${locale}/size-guide`}
             />
           )}
+
+          <ul className="mt-8 grid gap-3 sm:grid-cols-3">
+            {[
+              [trust.deliveryTitle, trust.deliveryBody],
+              [trust.returnTitle, trust.returnBody],
+              [trust.payTitle, trust.payBody],
+            ].map(([title, body]) => (
+              <li
+                key={title}
+                className="rounded-md border border-border bg-card px-3 py-2.5"
+              >
+                <p className="text-sm font-semibold text-ink-900">{title}</p>
+                <p className="mt-0.5 text-xs text-ink-500">{body}</p>
+              </li>
+            ))}
+          </ul>
 
           <dl className="mt-8 divide-y divide-border border-t border-border">
             <div className="flex justify-between gap-4 py-3">

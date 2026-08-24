@@ -11,16 +11,31 @@ import {
 } from "@/lib/db/schema";
 import { AuthorizationError, requireUser } from "@/lib/auth/guards";
 import { getMember, priceVariants } from "@/lib/db/queries/shop";
-import type { CartItem } from "@/lib/cart";
+import { cartLineKey, type CartItem } from "@/lib/cart";
+import {
+  embellishmentCost,
+  isLogoMethod,
+  isLogoPlacement,
+  placementColumn,
+  primaryMethod,
+  sortLogos,
+  type CartLogo,
+} from "@/lib/shop/logo";
 
 export type PricedCartLine = {
+  /** Identity of the line: variant plus logo choice. See lib/cart.ts. */
+  lineKey: string;
   variantId: string;
   productName: string;
   slug: string;
   image: string | null;
   colourName: string | null;
   size: string | null;
+  /** Garment price before decoration. */
   unitPrice: string;
+  /** Decoration surcharge for one garment, 0 when undecorated. */
+  embellishment: number;
+  logos: CartLogo[];
   qty: number;
   lineTotal: number;
   stockQty: number;
@@ -44,19 +59,35 @@ export type CartSummary = {
   approvalLimit: number;
   needsApproval: boolean;
   personalBlocked: boolean;
+  /** Whether this customer shows kroner or points to its employees. */
+  displayMode: "price" | "points";
 };
 
 export type CartResult = CartSummary | { ok: false; message: string };
 
-/** Caps what a single request can ask us to price. */
+/** Caps what a single request can ask us to price, and drops unknown logo ids. */
 function sanitise(items: CartItem[]): CartItem[] {
   return items
     .filter((i) => typeof i?.variantId === "string" && Number.isFinite(i?.qty))
     .map((i) => ({
       variantId: i.variantId,
       qty: Math.max(1, Math.min(999, Math.trunc(i.qty))),
+      logos: sanitiseLogos(i.logos),
     }))
     .slice(0, 100);
+}
+
+function sanitiseLogos(logos: unknown): CartLogo[] {
+  if (!Array.isArray(logos)) return [];
+  const seen = new Set<string>();
+  const clean: CartLogo[] = [];
+  for (const l of logos) {
+    if (!l || !isLogoPlacement(l.placement) || !isLogoMethod(l.method)) continue;
+    if (seen.has(l.placement)) continue;
+    seen.add(l.placement);
+    clean.push({ placement: l.placement, method: l.method });
+  }
+  return sortLogos(clean).slice(0, 4);
 }
 
 /**
@@ -101,7 +132,11 @@ export async function priceCart(items: CartItem[]): Promise<CartResult> {
         continue;
       }
       const unit = Number(p.unitPrice);
+      // Decoration is priced here, from lib/shop/logo.ts, never from the client.
+      const logos = item.logos ?? [];
+      const decoration = embellishmentCost(logos);
       lines.push({
+        lineKey: cartLineKey(item),
         variantId: p.variantId,
         productName: p.productName,
         slug: p.slug,
@@ -109,8 +144,10 @@ export async function priceCart(items: CartItem[]): Promise<CartResult> {
         colourName: p.colourName,
         size: p.size,
         unitPrice: p.unitPrice,
+        embellishment: decoration,
+        logos,
         qty: item.qty,
-        lineTotal: Math.round(unit * item.qty * 100) / 100,
+        lineTotal: round2((unit + decoration) * item.qty),
         stockQty: p.stockQty,
         co2Kg: p.co2Available && p.co2Kg ? Number(p.co2Kg) : null,
       });
@@ -150,6 +187,7 @@ export async function priceCart(items: CartItem[]): Promise<CartResult> {
       approvalLimit: settings.approvalLimit,
       needsApproval: settings.approvalLimit > 0 && total > settings.approvalLimit,
       personalBlocked: personal > 0 && !settings.allowPersonal,
+      displayMode: settings.displayMode,
     };
   } catch (error) {
     return { ok: false, message: message(error) };
@@ -227,6 +265,9 @@ export async function placeOrder(items: CartItem[]): Promise<PlaceOrderResult> {
           productVariantId: l.variantId,
           quantity: l.qty,
           unitPriceDkk: l.unitPrice,
+          logoPlacement: placementColumn(l.logos),
+          logoMethod: primaryMethod(l.logos),
+          embellishmentCostDkk: (l.embellishment * l.qty).toFixed(2),
           lineTotalDkk: l.lineTotal.toFixed(2),
         })),
       );
@@ -287,6 +328,7 @@ async function orgSettings(organisationId: string) {
     .select({
       approvalLimit: organisations.orderApprovalLimitDkk,
       allowPersonal: organisations.allowPersonalPurchases,
+      displayMode: organisations.displayMode,
     })
     .from(organisations)
     .where(eq(organisations.id, organisationId))
@@ -295,6 +337,7 @@ async function orgSettings(organisationId: string) {
   return {
     approvalLimit: org ? Number(org.approvalLimit) : 0,
     allowPersonal: org?.allowPersonal ?? true,
+    displayMode: org?.displayMode ?? ("price" as const),
   };
 }
 
@@ -319,6 +362,7 @@ async function currentQuota(organisationId: string, memberId: string) {
 function emptySummary(settings: {
   approvalLimit: number;
   allowPersonal: boolean;
+  displayMode: "price" | "points";
 }): CartSummary {
   return {
     ok: true,
@@ -336,5 +380,6 @@ function emptySummary(settings: {
     approvalLimit: settings.approvalLimit,
     needsApproval: false,
     personalBlocked: false,
+    displayMode: settings.displayMode,
   };
 }

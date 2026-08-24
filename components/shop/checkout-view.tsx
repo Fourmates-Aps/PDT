@@ -11,6 +11,7 @@ import {
 } from "@/app/[lang]/(shop)/actions";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/skeleton";
+import { describeLogos } from "@/lib/shop/logo";
 
 type Placed = { orderNumber: string; needsApproval: boolean };
 
@@ -32,7 +33,21 @@ export function CheckoutView({
   const money = new Intl.NumberFormat(locale === "da" ? "da-DK" : "en-GB", {
     maximumFractionDigits: 0,
   });
+  /*
+   * Points mode hides kroner from the employee, but NOT from the split: the
+   * personal share is a real MobilePay charge in kroner, so those two rows stay
+   * in currency whatever the customer's display setting says.
+   */
+  const amount = (n: number | string) =>
+    summary?.displayMode === "points"
+      ? `${money.format(Math.round(Number(n)))} ${dict.allowance.points}`
+      : `${money.format(Number(n))} kr.`;
   const kr = (n: number | string) => `${money.format(Number(n))} kr.`;
+
+  const logoLabels = {
+    placements: dict.logo.placements,
+    methods: dict.logo.methods,
+  };
 
   useEffect(() => {
     if (!ready || placed) return;
@@ -110,18 +125,23 @@ export function CheckoutView({
         <h2 className="font-semibold text-ink-900">{t.summary}</h2>
         <ul className="mt-4 divide-y divide-border">
           {summary.lines.map((l) => (
-            <li key={l.variantId} className="flex justify-between gap-4 py-3">
+            <li key={l.lineKey} className="flex justify-between gap-4 py-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink-900">
                   {l.productName}
                 </p>
                 <p className="tabular text-xs text-ink-500">
                   {[l.colourName, l.size].filter(Boolean).join(" · ")} · {l.qty} ×{" "}
-                  {kr(l.unitPrice)}
+                  {amount(Number(l.unitPrice) + l.embellishment)}
                 </p>
+                {l.logos.length > 0 ? (
+                  <p className="mt-0.5 text-xs text-highvis-700">
+                    {describeLogos(l.logos, logoLabels)}
+                  </p>
+                ) : null}
               </div>
               <span className="tabular shrink-0 text-sm font-semibold text-ink-900">
-                {kr(l.lineTotal)}
+                {amount(l.lineTotal)}
               </span>
             </li>
           ))}
@@ -133,11 +153,11 @@ export function CheckoutView({
           <h2 className="font-semibold text-ink-900">{t.allowanceTitle}</h2>
           {summary.hasQuota ? (
             <dl className="mt-3 space-y-2 text-sm">
-              <Row label={t.allowance} value={kr(summary.allowance)} />
-              <Row label={t.spent} value={kr(summary.used)} />
+              <Row label={t.allowance} value={amount(summary.allowance)} />
+              <Row label={t.spent} value={amount(summary.used)} />
               <Row
                 label={t.remaining}
-                value={kr(summary.remaining)}
+                value={amount(summary.remaining)}
                 strong
               />
             </dl>
@@ -151,7 +171,7 @@ export function CheckoutView({
         <section className="rounded-lg border border-border bg-card p-5">
           <h2 className="font-semibold text-ink-900">{t.splitTitle}</h2>
           <dl className="mt-3 space-y-2 text-sm">
-            <Row label={t.onAccount} value={kr(summary.onAccount)} />
+            <Row label={t.onAccount} value={amount(summary.onAccount)} />
             {summary.personal > 0 ? (
               <Row
                 label={t.personal}
@@ -160,7 +180,7 @@ export function CheckoutView({
               />
             ) : null}
             <div className="border-t border-border pt-2">
-              <Row label={t.total} value={kr(summary.total)} strong />
+              <Row label={t.total} value={amount(summary.total)} strong />
             </div>
           </dl>
 

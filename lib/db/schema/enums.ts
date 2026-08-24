@@ -47,3 +47,33 @@ export const embellishmentMethod = pgEnum("embellishment_method", [
   "print",
   "transfer",
 ]);
+
+/**
+ * How ORDERS reach a supplier. Data collection is a separate concern — see
+ * suppliers.data_channel — because most suppliers use different routes for the
+ * two (Mascot: EDI for orders, nightly FTP for product data).
+ */
+export const supplierChannel = pgEnum("supplier_channel", [
+  "api",
+  "graphql",
+  "edi",
+  "ftp",
+  "sftp",
+  "portal",
+  "csv",
+  "email",
+]);
+
+/**
+ * `accumulating` is the open basket demand drops into; `ready` means the
+ * supplier's minimum is met and it can be sent. Everything after that is the
+ * supplier's side of the conversation.
+ */
+export const supplierOrderStatus = pgEnum("supplier_order_status", [
+  "accumulating",
+  "ready",
+  "released",
+  "confirmed",
+  "received",
+  "cancelled",
+]);

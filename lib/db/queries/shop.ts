@@ -2,11 +2,13 @@ import "server-only";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  employeeQuotas,
   orderLines,
   orders,
   orgAssortment,
   orgPricing,
   organisationMembers,
+  organisations,
   productVariants,
   products,
 } from "@/lib/db/schema";
@@ -233,6 +235,7 @@ export async function getMember(userId: string, organisationId: string) {
       id: organisationMembers.id,
       fullName: organisationMembers.fullName,
       departmentId: organisationMembers.departmentId,
+      measurements: organisationMembers.measurements,
     })
     .from(organisationMembers)
     .where(
@@ -312,4 +315,271 @@ export async function getMyOrder(
     .where(eq(orderLines.orderId, order.id));
 
   return { order, lines };
+}
+
+/* ------------------------------------------------------------------ *
+ * Employee self-service: allowance, size history, reordering.
+ * ------------------------------------------------------------------ */
+
+export type AllowanceSummary = {
+  allowance: number;
+  used: number;
+  remaining: number;
+  pct: number;
+  hasQuota: boolean;
+  displayMode: "price" | "points";
+  approvalLimit: number;
+  periodEnd: string | null;
+};
+
+/**
+ * What the employee has left to spend, plus how their organisation wants it
+ * shown. One query behind the shop's balance bar and the account page, so the
+ * two can never disagree.
+ */
+export async function getAllowanceSummary(
+  organisationId: string,
+  memberId: string | null,
+): Promise<AllowanceSummary> {
+  const [org] = await db
+    .select({
+      displayMode: organisations.displayMode,
+      approvalLimit: organisations.orderApprovalLimitDkk,
+    })
+    .from(organisations)
+    .where(eq(organisations.id, organisationId))
+    .limit(1);
+
+  const quota = memberId
+    ? (
+        await db
+          .select({
+            allowanceDkk: employeeQuotas.allowanceDkk,
+            usedDkk: employeeQuotas.usedDkk,
+            periodEnd: employeeQuotas.periodEnd,
+          })
+          .from(employeeQuotas)
+          .where(
+            and(
+              eq(employeeQuotas.memberId, memberId),
+              eq(employeeQuotas.organisationId, organisationId),
+            ),
+          )
+          .orderBy(desc(employeeQuotas.periodStart))
+          .limit(1)
+      )[0]
+    : undefined;
+
+  const allowance = quota ? Number(quota.allowanceDkk) : 0;
+  const used = quota ? Number(quota.usedDkk) : 0;
+  const remaining = Math.max(0, Math.round((allowance - used) * 100) / 100);
+
+  return {
+    allowance,
+    used,
+    remaining,
+    pct: allowance > 0 ? Math.min(100, Math.round((used / allowance) * 100)) : 0,
+    hasQuota: quota !== undefined,
+    displayMode: org?.displayMode ?? "price",
+    approvalLimit: org ? Number(org.approvalLimit) : 0,
+    periodEnd: quota?.periodEnd ?? null,
+  };
+}
+
+/**
+ * The size this employee last ordered, per product.
+ *
+ * Drives the "Sidst bestilt: XL" badge and the pre-selected size. What somebody
+ * actually wore and kept beats any size table, so it takes precedence in
+ * lib/shop/sizing.ts.
+ */
+export async function listLastOrderedSizes(
+  organisationId: string,
+  memberId: string,
+): Promise<Map<string, string>> {
+  const rows = await db
+    .select({
+      productId: products.id,
+      size: productVariants.size,
+      createdAt: orders.createdAt,
+    })
+    .from(orderLines)
+    .innerJoin(orders, eq(orderLines.orderId, orders.id))
+    .innerJoin(
+      productVariants,
+      eq(orderLines.productVariantId, productVariants.id),
+    )
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(
+      and(
+        eq(orders.memberId, memberId),
+        eq(orders.organisationId, organisationId),
+      ),
+    )
+    .orderBy(desc(orders.createdAt))
+    .limit(400);
+
+  // First row per product wins because the query is newest-first.
+  const latest = new Map<string, string>();
+  for (const row of rows) {
+    if (row.size && !latest.has(row.productId)) latest.set(row.productId, row.size);
+  }
+  return latest;
+}
+
+export type ReorderLine = {
+  variantId: string;
+  qty: number;
+  productName: string;
+  slug: string;
+  image: string | null;
+  colourName: string | null;
+  size: string | null;
+  logoPlacement: string | null;
+  logoMethod: "embroidery" | "print" | "transfer" | null;
+  /** False when the variant left the assortment or is out of stock. */
+  available: boolean;
+};
+
+/**
+ * The employee's most recent order, shaped for one-tap reordering.
+ *
+ * Availability is resolved here rather than in the browser: a line whose variant
+ * has since left the assortment must not be re-addable, and the client has no
+ * way to know that.
+ */
+export async function getLastOrderForReorder(
+  organisationId: string,
+  memberId: string,
+): Promise<{ orderNumber: string; createdAt: Date; lines: ReorderLine[] } | null> {
+  const [order] = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      createdAt: orders.createdAt,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.memberId, memberId),
+        eq(orders.organisationId, organisationId),
+      ),
+    )
+    .orderBy(desc(orders.createdAt))
+    .limit(1);
+
+  if (!order) return null;
+
+  const lines = await db
+    .select({
+      variantId: orderLines.productVariantId,
+      qty: orderLines.quantity,
+      productName: products.name,
+      slug: products.slug,
+      image: products.primaryImage,
+      colourName: productVariants.colourName,
+      size: productVariants.size,
+      logoPlacement: orderLines.logoPlacement,
+      logoMethod: orderLines.logoMethod,
+      stockQty: productVariants.stockQty,
+      variantActive: productVariants.isActive,
+      productActive: products.isActive,
+      price: orgPricing.priceDkk,
+      enabled: orgAssortment.isEnabled,
+    })
+    .from(orderLines)
+    .innerJoin(
+      productVariants,
+      eq(orderLines.productVariantId, productVariants.id),
+    )
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .leftJoin(
+      orgAssortment,
+      and(
+        eq(orgAssortment.productId, products.id),
+        eq(orgAssortment.organisationId, organisationId),
+      ),
+    )
+    .leftJoin(
+      orgPricing,
+      and(
+        eq(orgPricing.productVariantId, productVariants.id),
+        eq(orgPricing.organisationId, organisationId),
+      ),
+    )
+    .where(eq(orderLines.orderId, order.id))
+    .limit(20);
+
+  return {
+    orderNumber: order.orderNumber,
+    createdAt: order.createdAt,
+    lines: lines.map((l) => ({
+      variantId: l.variantId,
+      qty: l.qty,
+      productName: l.productName,
+      slug: l.slug,
+      image: l.image,
+      colourName: l.colourName,
+      size: l.size,
+      logoPlacement: l.logoPlacement,
+      logoMethod: l.logoMethod,
+      available:
+        l.enabled === true &&
+        l.variantActive &&
+        l.productActive &&
+        l.price !== null &&
+        l.stockQty > 0,
+    })),
+  };
+}
+
+export type ReturnableItem = {
+  id: string;
+  orderNumber: string;
+  label: string;
+  orderedOn: Date;
+};
+
+/**
+ * Lines this employee could send back.
+ *
+ * Only shipped or delivered orders: something that has not left the building is
+ * a cancellation, not a return, and goes through the customer admin instead.
+ */
+export async function listReturnableItems(
+  organisationId: string,
+  memberId: string,
+): Promise<ReturnableItem[]> {
+  const rows = await db
+    .select({
+      id: orderLines.id,
+      orderNumber: orders.orderNumber,
+      createdAt: orders.createdAt,
+      productName: products.name,
+      colourName: productVariants.colourName,
+      size: productVariants.size,
+    })
+    .from(orderLines)
+    .innerJoin(orders, eq(orderLines.orderId, orders.id))
+    .innerJoin(
+      productVariants,
+      eq(orderLines.productVariantId, productVariants.id),
+    )
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(
+      and(
+        eq(orders.memberId, memberId),
+        eq(orders.organisationId, organisationId),
+        inArray(orders.status, ["shipped", "delivered"]),
+      ),
+    )
+    .orderBy(desc(orders.createdAt))
+    .limit(30);
+
+  return rows.map((r) => ({
+    id: r.id,
+    orderNumber: r.orderNumber,
+    orderedOn: r.createdAt,
+    label: [r.productName, r.colourName, r.size].filter(Boolean).join(" · "),
+  }));
 }

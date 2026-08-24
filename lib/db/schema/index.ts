@@ -7,6 +7,9 @@
  *  - `products` / `product_variants` are deliberately global supplier master data;
  *    tenancy is applied through org_assortment and org_pricing. See catalogue.ts.
  *  - Every table has at least one policy, which is what enables RLS in Drizzle.
+ *  - `suppliers` / `supplier_orders` are PDT's own purchasing and carry NO
+ *    organisation_id — they are restricted to platform staff instead. See
+ *    suppliers.ts.
  */
 
 export * from "./enums";
@@ -14,3 +17,4 @@ export * from "./organisations";
 export * from "./catalogue";
 export * from "./org-catalogue";
 export * from "./orders";
+export * from "./suppliers";

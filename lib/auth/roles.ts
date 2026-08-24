@@ -49,6 +49,9 @@ export const ROUTE_ROLES: Record<string, readonly Role[]> = {
   "/cart": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
   "/checkout": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
   "/orders": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
+  "/account": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
+  "/size-guide": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
+  "/returns": [ROLES.EMPLOYEE, ROLES.CUSTOMER_ADMIN, ROLES.ADMIN],
 };
 
 /** Roles permitted on `path`, or null when the path is public. */

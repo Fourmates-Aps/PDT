@@ -9,11 +9,13 @@ import {
   type ReactNode,
 } from "react";
 import {
-  CART_STORAGE_KEY,
   cartCount,
+  cartLineKey,
+  cartStorageKey,
   parseCart,
   type CartItem,
 } from "@/lib/cart";
+import type { CartLogo } from "@/lib/shop/logo";
 
 /*
  * The cart is an external store (localStorage), not React state, so it is read
@@ -24,34 +26,64 @@ import {
 
 const EMPTY: CartItem[] = [];
 
-// getSnapshot must return a STABLE reference when nothing changed, or React
-// re-renders forever. The raw string is the cache key.
-let cachedRaw: string | null = null;
-let cachedItems: CartItem[] = EMPTY;
+/*
+ * One store per storage key, so two providers for different users never share a
+ * snapshot cache. In practice there is one per page, but keying the cache makes
+ * the wrong answer impossible rather than merely unlikely.
+ *
+ * getSnapshot must return a STABLE reference when nothing changed, or React
+ * re-renders forever. The raw string is the cache key.
+ */
+type Store = {
+  subscribe: (onChange: () => void) => () => void;
+  getSnapshot: () => CartItem[];
+  read: () => CartItem[];
+  write: (next: CartItem[]) => void;
+};
 
-const listeners = new Set<() => void>();
+const stores = new Map<string, Store>();
 
-function emit() {
-  for (const listener of listeners) listener();
-}
+function storeFor(key: string): Store {
+  const existing = stores.get(key);
+  if (existing) return existing;
 
-function subscribe(onChange: () => void) {
-  listeners.add(onChange);
-  // Fires for writes made in OTHER tabs; same-tab writes call emit() directly.
-  window.addEventListener("storage", onChange);
-  return () => {
-    listeners.delete(onChange);
-    window.removeEventListener("storage", onChange);
+  const listeners = new Set<() => void>();
+  let cachedRaw: string | null = null;
+  let cachedItems: CartItem[] = EMPTY;
+
+  const emit = () => {
+    for (const listener of listeners) listener();
   };
-}
 
-function getSnapshot(): CartItem[] {
-  const raw = window.localStorage.getItem(CART_STORAGE_KEY);
-  if (raw !== cachedRaw) {
-    cachedRaw = raw;
-    cachedItems = parseCart(raw);
-  }
-  return cachedItems;
+  const read = () => {
+    const raw = window.localStorage.getItem(key);
+    if (raw !== cachedRaw) {
+      cachedRaw = raw;
+      cachedItems = parseCart(raw);
+    }
+    return cachedItems;
+  };
+
+  const store: Store = {
+    subscribe(onChange) {
+      listeners.add(onChange);
+      // Fires for writes made in OTHER tabs; same-tab writes call emit().
+      window.addEventListener("storage", onChange);
+      return () => {
+        listeners.delete(onChange);
+        window.removeEventListener("storage", onChange);
+      };
+    },
+    getSnapshot: read,
+    read,
+    write(next) {
+      window.localStorage.setItem(key, JSON.stringify(next));
+      emit();
+    },
+  };
+
+  stores.set(key, store);
+  return store;
 }
 
 /** The server has no localStorage; an empty cart is the only honest answer. */
@@ -59,25 +91,36 @@ function getServerSnapshot(): CartItem[] {
   return EMPTY;
 }
 
-function write(next: CartItem[]) {
-  window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(next));
-  emit();
-}
-
 type CartContextValue = {
   items: CartItem[];
   count: number;
   /** False during SSR and the first client render, so the badge can stay hidden. */
   ready: boolean;
-  add: (variantId: string, qty?: number) => void;
-  setQty: (variantId: string, qty: number) => void;
-  remove: (variantId: string) => void;
+  /**
+   * Adds a line. Lines are keyed by variant AND logo choice, so the same garment
+   * with two different logo placements stacks as two lines rather than merging.
+   */
+  add: (variantId: string, qty?: number, logos?: CartLogo[]) => void;
+  setQty: (lineKey: string, qty: number) => void;
+  remove: (lineKey: string) => void;
+  /** Drops every line for a variant, whatever logo choice it carries. */
+  removeVariant: (variantId: string) => void;
   clear: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export function CartProvider({
+  scope,
+  children,
+}: {
+  /** Signed-in user id: the cart is per person, not per browser. */
+  scope: string;
+  children: ReactNode;
+}) {
+  const store = useMemo(() => storeFor(cartStorageKey(scope)), [scope]);
+  const { subscribe, getSnapshot, read, write } = store;
+
   const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const ready = useSyncExternalStore(
     subscribe,
@@ -85,38 +128,52 @@ export function CartProvider({ children }: { children: ReactNode }) {
     () => false,
   );
 
-  const add = useCallback((variantId: string, qty = 1) => {
-    const current = getSnapshot();
-    const existing = current.find((i) => i.variantId === variantId);
-    write(
-      existing
-        ? current.map((i) =>
-            i.variantId === variantId
-              ? { ...i, qty: Math.min(999, i.qty + qty) }
-              : i,
-          )
-        : [...current, { variantId, qty }],
-    );
-  }, []);
+  const add = useCallback(
+    (variantId: string, qty = 1, logos?: CartLogo[]) => {
+      const current = read();
+      const key = cartLineKey({ variantId, logos });
+      const existing = current.find((i) => cartLineKey(i) === key);
+      write(
+        existing
+          ? current.map((i) =>
+              cartLineKey(i) === key
+                ? { ...i, qty: Math.min(999, i.qty + qty) }
+                : i,
+            )
+          : [...current, { variantId, qty, logos }],
+      );
+    },
+    [read, write],
+  );
 
-  const setQty = useCallback((variantId: string, qty: number) => {
-    const current = getSnapshot();
+  const setQty = useCallback((lineKey: string, qty: number) => {
+    const current = read();
     write(
       qty <= 0
-        ? current.filter((i) => i.variantId !== variantId)
+        ? current.filter((i) => cartLineKey(i) !== lineKey)
         : current.map((i) =>
-            i.variantId === variantId
+            cartLineKey(i) === lineKey
               ? { ...i, qty: Math.min(999, Math.trunc(qty)) }
               : i,
           ),
     );
-  }, []);
+  }, [read, write]);
 
-  const remove = useCallback((variantId: string) => {
-    write(getSnapshot().filter((i) => i.variantId !== variantId));
-  }, []);
+  const remove = useCallback(
+    (lineKey: string) => {
+      write(read().filter((i) => cartLineKey(i) !== lineKey));
+    },
+    [read, write],
+  );
 
-  const clear = useCallback(() => write([]), []);
+  const removeVariant = useCallback(
+    (variantId: string) => {
+      write(read().filter((i) => i.variantId !== variantId));
+    },
+    [read, write],
+  );
+
+  const clear = useCallback(() => write([]), [write]);
 
   const value = useMemo(
     () => ({
@@ -126,9 +183,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       add,
       setQty,
       remove,
+      removeVariant,
       clear,
     }),
-    [items, ready, add, setQty, remove, clear],
+    [items, ready, add, setQty, remove, removeVariant, clear],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

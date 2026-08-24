@@ -269,3 +269,46 @@ create policy approval_requests_decide on public.approval_requests
     organisation_id = public.auth_org_id()
     and public.auth_user_role() in ('customer_admin', 'admin')
   );
+
+-- ===========================================================================
+-- suppliers / supplier_orders / supplier_order_lines
+--
+-- PDT's OWN purchasing. These tables carry no organisation_id, so the tenant
+-- predicate used everywhere above does not apply — instead they are closed to
+-- customers entirely. A customer must never see what PDT pays a supplier, nor
+-- that their order is being pooled with a competitor's to reach a minimum.
+--
+-- Warehouse staff read (they receive the goods); only platform admins write.
+-- ===========================================================================
+drop policy if exists suppliers_staff_read on public.suppliers;
+create policy suppliers_staff_read on public.suppliers
+  for select to authenticated
+  using (public.auth_user_role() in ('admin', 'warehouse'));
+
+drop policy if exists suppliers_admin_write on public.suppliers;
+create policy suppliers_admin_write on public.suppliers
+  for all to authenticated
+  using (public.auth_user_role() = 'admin')
+  with check (public.auth_user_role() = 'admin');
+
+drop policy if exists supplier_orders_staff_read on public.supplier_orders;
+create policy supplier_orders_staff_read on public.supplier_orders
+  for select to authenticated
+  using (public.auth_user_role() in ('admin', 'warehouse'));
+
+drop policy if exists supplier_orders_admin_write on public.supplier_orders;
+create policy supplier_orders_admin_write on public.supplier_orders
+  for all to authenticated
+  using (public.auth_user_role() = 'admin')
+  with check (public.auth_user_role() = 'admin');
+
+drop policy if exists supplier_order_lines_staff_read on public.supplier_order_lines;
+create policy supplier_order_lines_staff_read on public.supplier_order_lines
+  for select to authenticated
+  using (public.auth_user_role() in ('admin', 'warehouse'));
+
+drop policy if exists supplier_order_lines_admin_write on public.supplier_order_lines;
+create policy supplier_order_lines_admin_write on public.supplier_order_lines
+  for all to authenticated
+  using (public.auth_user_role() = 'admin')
+  with check (public.auth_user_role() = 'admin');
