@@ -14,7 +14,8 @@ export type IconName =
   | "tag"
   | "plus"
   | "printer"
-  | "truck";
+  | "truck"
+  | "shield";
 
 /**
  * Mirrors the kunde-admin menu from the prototype (`NAV.kadmin`), minus the two
@@ -90,7 +91,10 @@ export function adminNav(dict: Dictionary, locale: Locale): NavGroup[] {
     },
     {
       label: t.groupSetup,
-      items: [{ href: `${base}/pricing`, label: t.pricing, icon: "tag" }],
+      items: [
+        { href: `${base}/pricing`, label: t.pricing, icon: "tag" },
+        { href: `${base}/staff`, label: t.staff, icon: "shield" },
+      ],
     },
   ];
 }

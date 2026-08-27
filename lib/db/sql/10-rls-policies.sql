@@ -312,3 +312,18 @@ create policy supplier_order_lines_admin_write on public.supplier_order_lines
   for all to authenticated
   using (public.auth_user_role() = 'admin')
   with check (public.auth_user_role() = 'admin');
+
+-- ===========================================================================
+-- audit_log
+--
+-- Read-only to platform admins, and DELIBERATELY NOTHING ELSE.
+--
+-- With no INSERT, UPDATE or DELETE policy, Postgres denies all three to every
+-- authenticated client — which is what makes the table append-only from the
+-- outside. Server-side writes go through Drizzle, which connects as the owner
+-- and bypasses RLS. An audit trail an actor can edit is not an audit trail.
+-- ===========================================================================
+drop policy if exists audit_log_admin_read on public.audit_log;
+create policy audit_log_admin_read on public.audit_log
+  for select to authenticated
+  using (public.auth_user_role() = 'admin');

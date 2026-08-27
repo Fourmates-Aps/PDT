@@ -11,6 +11,7 @@ import {
   PlusCircle,
   Printer,
   Settings,
+  Shield,
   Tag,
   Truck,
   Users,
@@ -32,6 +33,7 @@ const ICONS = {
   plus: PlusCircle,
   printer: Printer,
   truck: Truck,
+  shield: Shield,
 } satisfies Record<IconName, React.ComponentType<{ className?: string }>>;
 
 function NavList({

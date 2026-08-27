@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { authUsers } from "drizzle-orm/supabase";
 import { budgetPeriod, displayMode, memberRole } from "./enums";
 
@@ -72,6 +73,21 @@ export const organisations = pgTable(
       .default(true),
 
     isActive: boolean("is_active").notNull().default(true),
+
+    /**
+     * PDT ITSELF, not a customer.
+     *
+     * docs/PLATFORM-ADMIN.md: *"Staff accounts belong to PDT, not to a customer
+     * company."* Every other table hangs off `organisation_id`, and RLS reads it
+     * from the token — so PDT's own people need an organisation to belong to,
+     * or every policy needs a null special case. One flagged row is far cheaper
+     * than a nullable tenancy key.
+     *
+     * Exactly one row may carry this flag; the partial unique index below is
+     * what enforces it, rather than trusting every call site to check first.
+     */
+    isPlatform: boolean("is_platform").notNull().default(false),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -79,7 +95,12 @@ export const organisations = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("organisations_slug_key").on(t.slug)],
+  (t) => [
+    uniqueIndex("organisations_slug_key").on(t.slug),
+    uniqueIndex("organisations_one_platform")
+      .on(t.isPlatform)
+      .where(sql`is_platform = true`),
+  ],
 ).enableRLS();
 
 export const departments = pgTable(
