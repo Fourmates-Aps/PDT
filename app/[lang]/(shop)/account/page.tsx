@@ -17,6 +17,7 @@ import {
 } from "@/components/dashboard/primitives";
 import { Badge } from "@/components/ui/badge";
 import { formatAllowance, formatDate, formatMoney } from "@/lib/format";
+import { orderBadgeTone } from "@/lib/production";
 
 export function generateMetadata() {
   return pageMetadata((d) => d.shop.account.title);
@@ -180,15 +181,7 @@ export default async function AccountPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Badge
-                          variant={
-                            o.status === "delivered" || o.status === "shipped"
-                              ? "secondary"
-                              : o.status === "cancelled"
-                                ? "destructive"
-                                : "outline"
-                          }
-                        >
+                        <Badge variant={orderBadgeTone(o.status)}>
                           {dict.cadmin.orders.statuses[o.status]}
                         </Badge>
                         <span className="tabular text-sm font-semibold text-ink-900">

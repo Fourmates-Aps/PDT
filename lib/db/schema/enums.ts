@@ -17,15 +17,35 @@ export const budgetPeriod = pgEnum("budget_period", ["annual", "monthly"]);
  */
 export const displayMode = pgEnum("display_mode", ["price", "points"]);
 
+/**
+ * Order state — decided, not inferred.
+ *
+ * D-3 fixes the customer-visible happy path at exactly four stages:
+ * Booked → Arrived at warehouse → Sent to print/embroidery → Delivered.
+ * Goods arriving from the supplier is a stage because PDT buys in per order.
+ *
+ * Q-C3 adds the states an order needs when it does not take the happy path:
+ * `pending_approval` (D-2 makes a customer admin decide), `cancelled` and
+ * `rejected` (D-5 refers to "cancellation/rejection before dispatch"). The
+ * tracker renders those as an interruption, not as a step.
+ *
+ * There is NO dispatch state. Q-C2 (c): dispatch is an event — the parcel
+ * number, the invoice and `orders.dispatched_at` are stamped without moving
+ * the order — so "Leveret" keeps meaning the customer has it.
+ *
+ * `refunded` is kept from the previous enum rather than added: D-6 gives
+ * returns an owner but the returns model is not built, and dropping the value
+ * would discard any order already in it. Where a refund finally lives —
+ * here or on a `returns` row — is still open.
+ */
 export const orderStatus = pgEnum("order_status", [
-  "draft",
   "pending_approval",
-  "approved",
-  "in_production",
-  "packing",
-  "shipped",
+  "booked",
+  "arrived_at_warehouse",
+  "sent_to_print",
   "delivered",
   "cancelled",
+  "rejected",
   "refunded",
 ]);
 

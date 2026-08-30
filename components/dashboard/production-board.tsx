@@ -18,8 +18,9 @@ type Dict = Dictionary["admin"]["production"];
  * readers, and cannot half-drop a card. Drag can be layered on later as an
  * enhancement over the same actions.
  *
- * `shipped` is not offered as a destination here: dispatch needs a parcel
- * number, which is scanned in Pak & send.
+ * Dispatch is not offered here. It is an event that needs a scanned parcel
+ * number (Q-C2 c), so it belongs to Pak & send — this board links to it and
+ * shows the parcel number once it exists.
  */
 export function ProductionBoard({
   columns,
@@ -90,9 +91,13 @@ function Card({
   const [state, formAction, pending] = useActionState(moveOrderAction, null);
 
   const days = daysUntil(card.dueAt);
-  const tone = dueTone(card.status, days);
-  // Dispatch is Pak & send's job, so it is linked to rather than offered here.
-  const destinations = nextStages(card.status).filter((s) => s !== "shipped");
+  const dispatched = card.dispatchedAt !== null;
+  const tone = dueTone(card.status, days, dispatched);
+  // "Delivered" cannot be reached before the parcel has gone, and the parcel
+  // goes from Pak & send — so it only appears once dispatch has happened.
+  const destinations = nextStages(card.status).filter(
+    (s) => s !== "delivered" || dispatched,
+  );
 
   return (
     <article
@@ -157,7 +162,12 @@ function Card({
         </form>
       ) : null}
 
-      {card.status === "packing" ? (
+      {dispatched ? (
+        <p className="tabular mt-2 text-[11px] font-semibold text-success">
+          {dict.dispatched}
+          {card.glsParcelNumber ? ` · GLS ${card.glsParcelNumber}` : ""}
+        </p>
+      ) : card.status !== "delivered" ? (
         <a
           href={warehouseHref}
           className="mt-2 block text-[11px] font-semibold text-ink-500 transition-colors hover:text-ink-900"

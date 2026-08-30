@@ -277,7 +277,7 @@ export async function listShortfalls(): Promise<ShortfallLine[]> {
     )
     .where(
       and(
-        inArray(orders.status, ["approved", "in_production", "packing"]),
+        inArray(orders.status, ["booked", "arrived_at_warehouse", "sent_to_print"]),
         isNull(supplierOrderLines.id),
         sql`${productVariants.stockQty} < ${orderLines.quantity}`,
       ),

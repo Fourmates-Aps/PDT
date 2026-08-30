@@ -52,9 +52,9 @@ export default async function ProductionPage() {
           value={formatNumber(locale, summary.dueThisWeek)}
         />
         <Stat
-          label={t.kpiShipped}
-          value={formatNumber(locale, summary.shipped)}
-          sub={t.kpiShippedSub}
+          label={t.kpiDispatched}
+          value={formatNumber(locale, summary.dispatched)}
+          sub={t.kpiDispatchedSub}
         />
       </StatGrid>
 

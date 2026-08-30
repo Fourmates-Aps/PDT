@@ -8,16 +8,22 @@ import { ProductImage } from "@/components/shop/product-image";
 import { EmptyState } from "@/components/dashboard/primitives";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatMoney } from "@/lib/format";
+import { isStopped, orderBadgeTone } from "@/lib/production";
 
-/** Where each order status sits on the customer-facing tracker. */
+/**
+ * Where each order status sits on the customer-facing tracker.
+ *
+ * The four steps are D-3's stages, in order. `pending_approval` is BEFORE the
+ * first one — nothing has been booked yet — so it reads as -1 and the tracker
+ * shows a waiting note instead of a completed step. Cancelled and rejected
+ * orders (Q-C3) replace the tracker entirely: there is no progress to show.
+ */
 const TRACKER_STEP: Record<string, number> = {
-  draft: 0,
-  pending_approval: 0,
-  approved: 0,
-  in_production: 1,
-  packing: 2,
-  shipped: 3,
-  delivered: 4,
+  pending_approval: -1,
+  booked: 0,
+  arrived_at_warehouse: 1,
+  sent_to_print: 2,
+  delivered: 3,
 };
 
 export async function generateMetadata({
@@ -61,12 +67,11 @@ export default async function OrderDetailPage({
 
   const { order, lines } = result;
   const step = TRACKER_STEP[order.status] ?? 0;
-  const cancelled = order.status === "cancelled";
+  const stopped = isStopped(order.status);
   const steps = [
-    t.tracker.received,
-    t.tracker.production,
-    t.tracker.packing,
-    t.tracker.shipped,
+    t.tracker.booked,
+    t.tracker.arrived,
+    t.tracker.print,
     t.tracker.delivered,
   ];
 
@@ -88,15 +93,22 @@ export default async function OrderDetailPage({
             {formatDate(locale, order.createdAt)}
           </p>
         </div>
-        <Badge variant={cancelled ? "destructive" : "outline"}>
+        <Badge variant={orderBadgeTone(order.status)}>
           {dict.cadmin.orders.statuses[order.status]}
         </Badge>
       </div>
 
-      {!cancelled ? (
+      {!stopped ? (
         <section className="mt-6 rounded-lg border border-border bg-card p-5">
           <h2 className="font-semibold text-ink-900">{t.trackerTitle}</h2>
-          {/* Vertical on phones, horizontal once there is room — a five-step
+
+          {/* Waiting on a decision is not a step — the order has not started. */}
+          {step < 0 ? (
+            <p className="mt-3 rounded-md border border-warning/30 bg-warning/5 px-3.5 py-2.5 text-sm text-ink-800">
+              {t.tracker.awaitingApproval}
+            </p>
+          ) : null}
+          {/* Vertical on phones, horizontal once there is room — a four-step
               horizontal tracker at 390px is unreadable. */}
           <ol className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-0">
             {steps.map((label, i) => {
@@ -125,6 +137,11 @@ export default async function OrderDetailPage({
             })}
           </ol>
 
+          {/*
+            * The parcel can be on its way while the order still reads as being
+            * in print — dispatch does not move it (Q-C2 c). The tracking link
+            * is what tells the customer it has left.
+            */}
           {order.glsTrackUrl ? (
             <a
               href={order.glsTrackUrl}

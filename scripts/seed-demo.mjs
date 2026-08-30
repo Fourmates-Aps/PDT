@@ -164,10 +164,10 @@ async function doSeed() {
   console.log(`employees     ${memberIds.length} (with quotas)`);
 
   const ORDERS = [
-    { n: 1, status: "delivered", total: 1298, pay: "account" },
-    { n: 2, status: "shipped", total: 649, pay: "account" },
-    { n: 3, status: "in_production", total: 1947, pay: "account" },
-    { n: 4, status: "packing", total: 649, pay: "account" },
+    { n: 1, status: "delivered", total: 1298, pay: "account", dispatched: true },
+    { n: 2, status: "sent_to_print", total: 649, pay: "account", dispatched: true },
+    { n: 3, status: "sent_to_print", total: 1947, pay: "account" },
+    { n: 4, status: "arrived_at_warehouse", total: 649, pay: "account" },
     { n: 5, status: "pending_approval", total: 1480, pay: "account" },
     { n: 6, status: "pending_approval", total: 1120, pay: "account" },
     { n: 7, status: "pending_approval", total: 2260, pay: "split" },
@@ -181,13 +181,21 @@ async function doSeed() {
     const personal = o.pay === "split" ? 260 : 0;
     const account = o.total - personal;
 
+    // Dispatch is an event, not a stage (Q-C2 c): a parcel that has gone
+    // carries a number and a timestamp while the order stays where it is.
+    const parcel = o.dispatched ? `0123456789${o.n}` : null;
+
     const [order] = await sql`
       insert into orders
         (organisation_id, member_id, order_number, status, payment_method,
-         account_amount_dkk, personal_amount_dkk, total_dkk)
+         account_amount_dkk, personal_amount_dkk, total_dkk,
+         gls_parcel_number, gls_track_url, dispatched_at)
       values
         (${org.id}, ${member.id}, ${`PDT-${year}-${String(9000 + o.n)}`},
-         ${o.status}, ${o.pay}, ${account}, ${personal}, ${o.total})
+         ${o.status}, ${o.pay}, ${account}, ${personal}, ${o.total},
+         ${parcel},
+         ${parcel ? `https://gls-group.eu/DK/da/find-pakke?match=${parcel}` : null},
+         ${o.dispatched ? sql`now()` : null})
       returning id
     `;
 

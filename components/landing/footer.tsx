@@ -1,7 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { otherLocale } from "@/lib/i18n";
 import { Container } from "./section";
+import { BrandLogo, NewWaveBadge } from "@/components/public/brand-logo";
+
+/** The card marks the live site shows, in the order it shows them. */
+const PAYMENT_MARKS = ["visa", "mastercard", "mobilepay"] as const;
 
 export function Footer({
   dict,
@@ -14,19 +19,30 @@ export function Footer({
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-ink-900 py-14 text-bone-50 md:py-16">
-      <Container>
+    // The client's own product photography sits behind the footer at low
+    // opacity, exactly as on the live site — dark enough that the four columns
+    // of small text on top of it stay legible.
+    <footer className="relative isolate overflow-hidden bg-ink-900 py-14 text-bone-50 md:py-16">
+      <Image
+        src="/images/photos/footer-texture.webp"
+        alt=""
+        fill
+        sizes="100vw"
+        aria-hidden="true"
+        className="object-cover object-right opacity-20"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-ink-900 via-ink-900/90 to-ink-900/60" aria-hidden="true" />
+
+      <Container className="relative">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="lg:col-span-2">
-            <p className="font-display text-lg font-bold tracking-tight">
-              {dict.footer.company}
-            </p>
-            <p className="mt-1 font-display text-[9px] font-semibold uppercase tracking-[0.24em] text-highvis-400">
-              Be your brand
-            </p>
+          <div>
+            {/* The wordmark as delivered — light artwork, drawn for exactly this
+                kind of dark ground. */}
+            <BrandLogo tone="light" className="h-11 w-auto" />
             <p className="mt-4 max-w-[36ch] text-sm text-ink-300">
               {dict.footer.tagline}
             </p>
+            <NewWaveBadge className="mt-5 h-11 w-auto" />
           </div>
 
           <div>
@@ -34,9 +50,44 @@ export function Footer({
               {dict.footer.showroomsTitle}
             </h2>
             <ul className="mt-3 space-y-1.5 text-sm">
-              {dict.footer.showrooms.map((city) => (
-                <li key={city}>{city}</li>
+              {dict.footer.showrooms.map((address) => (
+                <li key={address}>{address}</li>
               ))}
+            </ul>
+          </div>
+
+          <div>
+            <h2 className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-300">
+              {dict.footer.informationTitle}
+            </h2>
+            {/* Only routes that exist. The live site's footer links to Kataloger,
+                Brands and Handelsbetingelser as well; none of those pages are
+                built, and a footer full of 404s is worse than a short footer. */}
+            <ul className="mt-3 space-y-1.5 text-sm">
+              <li>
+                <Link
+                  href={`/${locale}/katalog`}
+                  className="hover:text-highvis-400"
+                >
+                  {dict.public.header.catalogue}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`/${locale}/om-os`}
+                  className="hover:text-highvis-400"
+                >
+                  {dict.public.header.about}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`/${locale}/login`}
+                  className="hover:text-highvis-400"
+                >
+                  {dict.public.utility.login}
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -67,10 +118,27 @@ export function Footer({
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-2 border-t border-bone-200/10 pt-6 text-xs text-ink-300 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 flex flex-col gap-4 border-t border-bone-200/10 pt-6 text-xs text-ink-300 sm:flex-row sm:items-center sm:justify-between">
           <p className="tabular">
             © {year} {dict.footer.company} · {dict.footer.cvr}
           </p>
+
+          {/* Marks, not claims: these say which cards the shop accepts today.
+              Nothing on this platform takes a payment yet — that is Phase 3. */}
+          <ul className="flex items-center gap-2.5">
+            {PAYMENT_MARKS.map((mark) => (
+              <li key={mark} className="rounded-sm bg-bone-50 px-2 py-1">
+                <Image
+                  src={`/images/icons/payment/${mark}.svg`}
+                  alt={mark}
+                  width={38}
+                  height={24}
+                  className="h-4 w-auto"
+                />
+              </li>
+            ))}
+          </ul>
+
           <p>
             {dict.footer.pricesNote} {dict.footer.rights}
           </p>

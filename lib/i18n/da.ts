@@ -183,14 +183,165 @@ export const da = {
   footer: {
     tagline: "Arbejdstøj, profiltøj og firmagaver med jeres logo.",
     showroomsTitle: "Showrooms",
-    showrooms: ["Vejle", "Billund", "Fredericia", "Skjern"],
+    // Full addresses, as the live site's footer carries them. Individual staff
+    // mobiles are deliberately left out: they are personal data, and one shared
+    // number does the same job.
+    showrooms: [
+      "Bugattivej 9 · 7100 Vejle",
+      "Snaremosevej 23F · 7000 Fredericia",
+      "Bredgade 13a · 6900 Skjern",
+      "Montanavej 9 · 7190 Billund",
+    ],
     contactTitle: "Kontakt",
     phoneLabel: "Telefon",
     phone: "22 56 79 80",
+    informationTitle: "Information",
     company: "Profil Design Trading ApS",
     cvr: "CVR 35657886",
     rights: "Alle rettigheder forbeholdes.",
     pricesNote: "Alle priser er ekskl. moms.",
+  },
+
+  /**
+   * The public front — everything an unauthenticated visitor sees.
+   *
+   * Mirrors the structure of profildesigntrading.dk (spec §0b) in PDT's own
+   * design system: same sections, same behaviour, no prices anywhere.
+   */
+  public: {
+    utility: {
+      items: [
+        "Priserne vises ekskl. moms",
+        "Hurtig service og levering",
+        "Kæmpe sortiment",
+        "Personlig kundeservice",
+      ],
+      apply: "Ansøg om B2B-login",
+      login: "Log ind",
+    },
+    header: {
+      home: "Forside",
+      catalogue: "Sortiment",
+      about: "Om os",
+      searchLabel: "Søg i sortimentet",
+      searchPlaceholder: "Indtast søgning",
+      search: "Søg",
+      categories: "Kategorier",
+      skipToContent: "Spring til indhold",
+    },
+    welcome: {
+      eyebrow: "Velkommen",
+      title: "Fire afdelinger, ét sortiment.",
+      body: [
+        "Profil Design Trading ligger i Vejle, Fredericia, Skjern og Billund. Vi har leveret arbejdstøj, profiltøj og firmagaver siden 1994.",
+        "Vi servicerer jeres medarbejdere direkte, så hverken I eller de skal bruge tid på at holde styr på virksomhedens tøjindkøb.",
+      ],
+      stats: [
+        { value: "1994", label: "Etableret" },
+        { value: "4", label: "Afdelinger" },
+        { value: "8", label: "Mærker i sortimentet" },
+      ],
+    },
+    /**
+     * The dark three-step strip, with the live site's own icons.
+     *
+     * Its labels are the live site's, lightly reworded to address a company
+     * rather than a person. This is the customer-facing "how do I buy" band;
+     * the deeper platform explainer (how.*) moved to /om-os.
+     */
+    steps: {
+      items: [
+        {
+          icon: "cart",
+          title: "Tilføj produkter til kurven",
+          body: "Vælg netop de produkter I har brug for, og tilpas dem med tryk eller broderi.",
+        },
+        {
+          icon: "logo",
+          title: "Vi sætter logo på jeres tøj",
+          body: "Vi sørger for, at de valgte produkter bliver tilpasset efter jeres design manual.",
+        },
+        {
+          icon: "delivery",
+          title: "Levering lige til døren",
+          body: "Vi leverer produkterne med logo direkte til jer eller til den enkelte medarbejder.",
+        },
+      ],
+    },
+    promises: {
+      items: [
+        { icon: "delivery", label: "Hurtig service og levering", sub: "2–4 hverdage" },
+        { icon: "service", label: "Personlig kundeservice", sub: "Fire showrooms" },
+        { icon: "range", label: "Kæmpe sortiment", sub: "Otte mærker" },
+        { icon: "savings", label: "Vi sparer jer for tid og penge", sub: "Ét sted, én faktura" },
+        { icon: "environment", label: "Miljøbevidst", sub: "CO₂ pr. vare" },
+      ],
+    },
+    editorial: {
+      eyebrow: "Det leverer vi",
+      title: "Fra profiltøj til kataloger.",
+      lead: "Områderne som Profil Design Trading dækker i dag.",
+      items: [
+        { image: "profiltoej", label: "Profiltøj" },
+        { image: "firmagave", label: "Firmagave" },
+        { image: "arbejdstoej", label: "Arbejdstøj" },
+        { image: "arbejdssko", label: "Arbejdssko" },
+        { image: "webshop", label: "Webshopløsning" },
+        { image: "kataloger", label: "Kataloger" },
+      ],
+    },
+    categories: {
+      eyebrow: "Sortiment",
+      title: "Find det, jeres folk skal have på.",
+      lead: "Kategorierne kommer fra sortimentet, ikke fra en menu vi har fundet på.",
+      count: "{n} varer",
+      all: "Se hele sortimentet",
+    },
+    products: {
+      eyebrow: "Nyheder",
+      title: "Nyt i sortimentet",
+      lead: "Priser og bestilling kræver login — det er aftalen med jeres virksomhed, der bestemmer prisen.",
+      viewAll: "Se alle varer",
+    },
+    card: {
+      sku: "Varenr.",
+      pricesHidden: "Log ind for priser",
+    },
+    catalogue: {
+      title: "Sortiment",
+      lead: "Hele sortimentet. Priser vises, når I er logget ind.",
+      allCategories: "Alle kategorier",
+      resultCount: "{n} varer",
+      searchTitle: "Søgning: {q}",
+      empty: "Ingen varer matchede.",
+      emptyHint: "Prøv en anden kategori eller en kortere søgning.",
+      back: "← Alt sortiment",
+    },
+    product: {
+      back: "← Tilbage til sortimentet",
+      sku: "Varenr.",
+      brand: "Mærke",
+      category: "Kategori",
+      material: "Materiale",
+      colours: "Farver",
+      sizes: "Størrelser",
+      co2: "CO₂ pr. stk.",
+      co2Unavailable: "Ikke oplyst af leverandøren",
+      // The live site's exact promise to an anonymous visitor.
+      loginNotice: "Du skal være logget ind for at kunne lave bestillinger.",
+      loginBody:
+        "Jeres priser aftales med jeres virksomhed, og logoet ligger allerede på jeres designmanual. Log ind for at se priser og bestille.",
+      notFound: "Varen blev ikke fundet.",
+    },
+    help: {
+      eyebrow: "Kontakt",
+      title: "Har I brug for hjælp?",
+      lead: "Vi ringer gerne op. Så finder vi ud af, hvad der skal til.",
+    },
+    about: {
+      title: "Om Profil Design Trading",
+      lead: "Hvorfor platformen findes, og hvad den gør for jeres tøjindkøb.",
+    },
   },
   auth: {
     login: {
@@ -475,12 +626,11 @@ export const da = {
     },
     production: {
       title: "Produktionsflow",
-      lead: "Ordrer på vej gennem tryk, broderi, pakning og afsendelse. Kortene flytter sig, efterhånden som arbejdet skrider frem.",
+      lead: "Ordrer på vej fra booking til levering. Kortene flytter sig, efterhånden som arbejdet skrider frem.",
       stages: {
-        approved: "Godkendt",
-        in_production: "Tryk / broderi",
-        packing: "Pakning",
-        shipped: "Sendt",
+        booked: "Booking",
+        arrived_at_warehouse: "Ankommet på lager",
+        sent_to_print: "Sendt til tryk/broderi",
         delivered: "Leveret",
       },
       kpiActive: "Aktive ordrer",
@@ -488,8 +638,8 @@ export const da = {
       kpiLate: "Forsinkede",
       kpiLateSub: "over forventet dato",
       kpiWeek: "Forfalder denne uge",
-      kpiShipped: "Sendt",
-      kpiShippedSub: "afventer levering",
+      kpiDispatched: "Afsendt",
+      kpiDispatchedSub: "afventer levering hos GLS",
       lateBanner:
         "{n} ordre(r) er over den forventede afsendelsesdato. Kontakt kunden, hvis en ny dato skal aftales.",
       empty: "Ingen ordrer i denne fase.",
@@ -502,17 +652,19 @@ export const da = {
       needsDecoration: "Kræver tryk/broderi",
       moveTo: "Flyt til",
       moving: "Flytter…",
-      shipHint: "Sendes fra Pak & send, hvor pakkelabelen scannes.",
+      dispatched: "Afsendt",
       dateNote:
         "Forventet dato er beregnet som 3 arbejdsdage efter bestillingen — der ligger endnu ingen aftalt leveringsdato på ordren.",
       messages: {
         moved: "{order} flyttet.",
-        shipped: "{order} sendt · GLS {parcel}.",
+        dispatched: "{order} afsendt · GLS {parcel}.",
         notFound: "Ordren blev ikke fundet.",
         movedOn: "Ordren er flyttet imens — genindlæs siden.",
-        needsParcel: "Scan en GLS-pakkelabel for at sende ordren.",
+        needsDispatch:
+          "Ordren kan først markeres som leveret, når pakken er afsendt fra Pak & send.",
         invalidParcel: "Ugyldig GLS-kode — scan igen.",
-        cannotShip: "Ordren kan ikke sendes fra sin nuværende status.",
+        cannotDispatch: "Ordren kan ikke afsendes fra sin nuværende status.",
+        alreadyDispatched: "Ordren er allerede afsendt.",
         invalid: "Ugyldig handling.",
         denied: "Du har ikke adgang til det.",
         generic: "Noget gik galt.",
@@ -650,14 +802,14 @@ export const da = {
     },
     packship: {
       title: "Pak & send",
-      lead: "Nye ordrer → pakning → tryk/broderi → GLS-scanning → afsendt. Systemet tjekker om varerne kan plukkes.",
-      kpiNew: "Klar til pakning",
-      kpiNewSub: "alle varer på lager",
+      lead: "Booking → ankommet på lager → tryk/broderi → GLS-scanning. Systemet tjekker, om leverandøren har varerne.",
+      kpiArrived: "På lager",
+      kpiArrivedSub: "klar til at arbejde på",
       kpiWaiting: "Afventer varer",
-      kpiWaitingSub: "kan ikke plukkes endnu",
+      kpiWaitingSub: "leverandøren har dem ikke endnu",
       kpiPrint: "I tryk/broderi",
-      kpiShipped: "Sendt",
-      kpiShippedSub: "med GLS-nummer",
+      kpiDispatched: "Afsendt",
+      kpiDispatchedSub: "med GLS-nummer",
       empty: "Ingen ordrer i køen lige nu.",
       customer: "Kunde",
       due: "Forventet afsendt",
@@ -670,10 +822,10 @@ export const da = {
       waiting: "Afventer levering",
       stockCount: "{n} stk. på lager",
       blocked:
-        "Kan ikke pakkes endnu — én eller flere varer afventer levering fra leverandøren.",
-      startPacking: "Start pakning",
+        "Kan ikke modtages endnu — én eller flere varer afventer levering fra leverandøren.",
+      toArrived: "Modtaget på lager",
       toPrint: "Send til tryk/broderi",
-      printDone: "Tryk færdig → pakning",
+      markDelivered: "Markér som leveret",
       back: "Tilbage",
       moving: "Opdaterer…",
       scanTitle: "Scan GLS-label",
@@ -681,25 +833,27 @@ export const da = {
         "Scan pakkelabelen, eller indtast koden. En håndscanner taster den ind og trykker Enter.",
       scanLabel: "GLS-kode",
       scanPlaceholder: "Scan eller indtast…",
-      scanSubmit: "Bekræft & send",
-      scanning: "Sender…",
+      scanSubmit: "Bekræft afsendelse",
+      scanning: "Afsender…",
       scanCancel: "Annullér",
-      shipped: "Sendt",
+      dispatched: "Afsendt",
       track: "Følg pakken",
       messages: {
         moved: "{order} flyttet.",
-        shipped: "{order} sendt · GLS {parcel}.",
+        dispatched: "{order} afsendt · GLS {parcel}.",
         notFound: "Ordren blev ikke fundet.",
         movedOn: "Ordren er flyttet imens — genindlæs siden.",
-        needsParcel: "Scan en GLS-pakkelabel for at sende ordren.",
+        needsDispatch:
+          "Scan en GLS-pakkelabel, før ordren markeres som leveret.",
         invalidParcel: "Ugyldig GLS-kode — scan igen.",
-        cannotShip: "Ordren kan ikke sendes fra sin nuværende status.",
+        cannotDispatch: "Ordren kan ikke afsendes fra sin nuværende status.",
+        alreadyDispatched: "Ordren er allerede afsendt.",
         invalid: "Ugyldig handling.",
         denied: "Du har ikke adgang til det.",
         generic: "Noget gik galt.",
       },
       glsNote:
-        "GLS-integrationen er ikke koblet på endnu: koden gemmes på ordren, men labelen bestilles ikke automatisk.",
+        "GLS-integrationen er ikke koblet på endnu: koden gemmes på ordren, men labelen bestilles ikke automatisk. Ordren markeres som leveret manuelt, indtil GLS kan bekræfte det selv.",
     },
   },
   cadmin: {
@@ -819,14 +973,13 @@ export const da = {
       payment: "Betaling",
       tracking: "Track & trace",
       statuses: {
-        draft: "Kladde",
         pending_approval: "Afventer godkendelse",
-        approved: "Godkendt",
-        in_production: "I produktion",
-        packing: "Pakkes",
-        shipped: "Sendt",
+        booked: "Booking",
+        arrived_at_warehouse: "Ankommet på lager",
+        sent_to_print: "Sendt til tryk/broderi",
         delivered: "Leveret",
         cancelled: "Annulleret",
+        rejected: "Afvist",
         refunded: "Refunderet",
       },
       payments: {
@@ -973,11 +1126,12 @@ export const da = {
       notFound: "Ordren blev ikke fundet.",
       trackerTitle: "Status",
       tracker: {
-        received: "Modtaget",
-        production: "Tryk/broderi",
-        packing: "Pakning",
-        shipped: "Sendt",
+        booked: "Booking",
+        arrived: "Ankommet på lager",
+        print: "Tryk/broderi",
         delivered: "Leveret",
+        awaitingApproval:
+          "Ordren afventer godkendelse hos jeres administrator og er endnu ikke bestilt.",
       },
       trackingLink: "Følg pakken",
     },

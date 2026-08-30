@@ -1,11 +1,31 @@
+import Image from "next/image";
 import type { Dictionary } from "@/lib/i18n";
 import { Section, SectionHead } from "./section";
 
-/** The single dark section on the page — it anchors the composition and gives the
-    accent one place to sit at full strength. */
+/**
+ * The single dark section on the page — it anchors the composition and gives the
+ * accent one place to sit at full strength.
+ *
+ * The forest behind it is the client's own "Grønt ansvar" banner. It sits at low
+ * opacity because it has to stay a background: the text over it carries a
+ * disclaimer about data coverage, and that has to be readable, not atmospheric.
+ */
 export function Esg({ dict }: { dict: Dictionary }) {
   return (
-    <Section id="esg" tone="ink">
+    <div className="relative isolate overflow-hidden bg-ink-900">
+      <Image
+        src="/images/photos/green-responsibility.webp"
+        alt=""
+        fill
+        sizes="100vw"
+        aria-hidden="true"
+        className="object-cover object-center opacity-25"
+      />
+      <div
+        className="absolute inset-0 bg-gradient-to-r from-ink-900 via-ink-900/85 to-ink-900/55"
+        aria-hidden="true"
+      />
+      <Section id="esg" tone="ink" className="relative !bg-transparent">
       <div className="grid gap-10 lg:grid-cols-[1fr_0.85fr] lg:gap-16">
         <div>
           <SectionHead
@@ -36,6 +56,7 @@ export function Esg({ dict }: { dict: Dictionary }) {
           ))}
         </ul>
       </div>
-    </Section>
+      </Section>
+    </div>
   );
 }

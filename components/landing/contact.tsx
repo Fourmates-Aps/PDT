@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { Section, Eyebrow } from "./section";
 import { LeadForm } from "./lead-form";
@@ -44,6 +45,18 @@ export function Contact({
               </dd>
             </div>
           </dl>
+
+          {/* The client's own "har du brug for hjælp" photograph. Decorative:
+              the person is not named, so an alt text would only be noise. */}
+          <Image
+            src="/images/photos/help.webp"
+            alt=""
+            width={645}
+            height={325}
+            aria-hidden="true"
+            sizes="(min-width: 1024px) 380px, 90vw"
+            className="mt-8 hidden h-auto w-full max-w-[380px] lg:block"
+          />
         </div>
 
         <LeadForm dict={dict.lead} locale={locale} />

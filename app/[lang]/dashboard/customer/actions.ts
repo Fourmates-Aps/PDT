@@ -275,7 +275,10 @@ export async function decideApprovalAction(
     await db
       .update(orders)
       .set({
-        status: decision === "approved" ? "approved" : "cancelled",
+        // A rejected order is `rejected`, not `cancelled` — Q-C3 keeps the two
+        // apart because they mean different things to the employee reading the
+        // tracker, and D-5 refers to both when saying no invoice is raised.
+        status: decision === "approved" ? "booked" : "rejected",
         updatedAt: new Date(),
       })
       .where(

@@ -1,21 +1,29 @@
 /**
- * The fulfilment pipeline: one order's journey from approved to delivered.
+ * The fulfilment pipeline: one order's journey from booked to delivered.
  *
- * The prototype draws this as a five-column kanban (Design/godkendelse →
- * Tryk/broderi → Pakning → Klar → Leveret). Those columns map onto the
- * `order_status` enum we already have, so the board is a view of real order
- * state rather than a second copy of it that can drift.
+ * The four stages are DECIDED, not derived — docs/PRODUCT-WORKFLOW-SPEC.md §0
+ * D-3 fixes them as Booking → Ankommet på lager → Sendt til tryk/broderi →
+ * Leveret, and the same list is used by the employee tracker, the company
+ * admin's order list, the warehouse board and the invoice trigger. Nothing is
+ * allowed to keep its own copy.
  *
- * Everything before `approved` belongs to the customer's approval flow, and
- * everything after `delivered` (cancelled, refunded) is an exception, not a
- * stage — neither appears on the board.
+ * Note the shape: goods ARRIVE before they are decorated. PDT buys in per
+ * customer order, so "the supplier's parcel landed" is something the customer
+ * is genuinely waiting on, and the old approved → print → pack → ship order
+ * simply had no step for it.
+ *
+ * DISPATCH IS NOT A STAGE — Q-C2 (c). The parcel number, the invoice (D-5) and
+ * `orders.dispatched_at` are stamped without moving the order, so "Leveret"
+ * still means the customer has the parcel rather than that PDT has let go of
+ * it. Everything outside the happy path (pending_approval, cancelled,
+ * rejected, refunded — Q-C3) is an interruption, not a stage, and never
+ * appears on the board.
  */
 
 export const STAGES = [
-  "approved",
-  "in_production",
-  "packing",
-  "shipped",
+  "booked",
+  "arrived_at_warehouse",
+  "sent_to_print",
   "delivered",
 ] as const;
 
@@ -32,20 +40,19 @@ export function stageIndex(stage: Stage): number {
 /**
  * Which stages an order may move to next.
  *
- * `approved` has two exits on purpose: an order with no decoration skips
- * print/embroidery entirely and goes straight to packing. Forcing it through a
- * production stage nobody works on is how a board stops being trusted.
+ * `arrived_at_warehouse` has two exits on purpose: an order with no decoration
+ * never goes to print, and forcing it through a stage nobody works on is how a
+ * board stops being trusted.
  *
  * One step backwards is allowed while the goods are still in the building,
  * because "I moved the wrong card" is more common than any other correction.
- * Nothing moves back out of `shipped`: the parcel has left, and pretending
- * otherwise loses the tracking number.
+ * `delivered` is terminal, and it cannot be reached at all until the parcel has
+ * actually been dispatched — see requiresDispatch.
  */
 const TRANSITIONS: Record<Stage, readonly Stage[]> = {
-  approved: ["in_production", "packing"],
-  in_production: ["packing", "approved"],
-  packing: ["shipped", "in_production"],
-  shipped: ["delivered"],
+  booked: ["arrived_at_warehouse"],
+  arrived_at_warehouse: ["sent_to_print", "delivered", "booked"],
+  sent_to_print: ["delivered", "arrived_at_warehouse"],
   delivered: [],
 };
 
@@ -57,9 +64,28 @@ export function nextStages(from: Stage): readonly Stage[] {
   return TRANSITIONS[from] ?? [];
 }
 
-/** Moving into `shipped` needs a parcel number — see shipOrderAction. */
-export function requiresParcelNumber(to: Stage): boolean {
-  return to === "shipped";
+/**
+ * `delivered` requires a dispatch to have happened first.
+ *
+ * Under Q-C2 (c) the parcel number lives on the dispatch event, not on a stage
+ * change, so this is what stops an order being marked delivered while it is
+ * still on a shelf — the case that loses a parcel.
+ */
+export function requiresDispatch(to: Stage): boolean {
+  return to === "delivered";
+}
+
+/**
+ * Whether an order can be dispatched from where it stands.
+ *
+ * Only once the goods are physically here: a `booked` order is still at the
+ * supplier, and there is nothing in the building to put in a parcel.
+ *
+ * TODO(gls): `delivered` is set by hand today. It belongs on a GLS delivery
+ * webhook — that is the "GLS confirmation" Q-C2 (c) names.
+ */
+export function canDispatch(stage: Stage): boolean {
+  return stage === "arrived_at_warehouse" || stage === "sent_to_print";
 }
 
 /**
@@ -101,12 +127,53 @@ export type DueTone = "late" | "soon" | "ok" | "done";
 /**
  * How a card's due date should read.
  *
- * An order already shipped or delivered is `done` whatever the date says —
- * a red "2 days late" on a parcel the customer has in their hands is noise.
+ * The date being tracked is the DISPATCH date, so an order that has been
+ * dispatched is `done` whatever the calendar says. Since dispatch no longer
+ * changes the status, that has to be read from the timestamp rather than from
+ * the stage — a red "2 days late" on a parcel already with GLS is noise.
  */
-export function dueTone(stage: Stage, days: number): DueTone {
-  if (stage === "shipped" || stage === "delivered") return "done";
+export function dueTone(
+  stage: Stage,
+  days: number,
+  dispatched = false,
+): DueTone {
+  if (dispatched || stage === "delivered") return "done";
   if (days < 0) return "late";
   if (days <= 1) return "soon";
   return "ok";
+}
+
+/**
+ * Everything that is not one of the four stages — Q-C3.
+ *
+ * These are interruptions, not steps: the tracker shows them instead of
+ * progress, and they never appear as a board column.
+ */
+export const INTERRUPTIONS = [
+  "pending_approval",
+  "cancelled",
+  "rejected",
+  "refunded",
+] as const;
+
+export type Interruption = (typeof INTERRUPTIONS)[number];
+
+/** True for a state the order will not come back from on its own. */
+export function isStopped(status: string): boolean {
+  return status === "cancelled" || status === "rejected" || status === "refunded";
+}
+
+/**
+ * How an order's status badge should read, in one place.
+ *
+ * Three screens showed this and all three had their own copy of the rule, so
+ * they drifted the moment the enum changed. Settled means the customer has it;
+ * a stopped order reads as a problem; everything else is in progress.
+ */
+export function orderBadgeTone(
+  status: string,
+): "secondary" | "destructive" | "outline" {
+  if (status === "delivered") return "secondary";
+  if (isStopped(status)) return "destructive";
+  return "outline";
 }

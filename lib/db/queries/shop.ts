@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   employeeQuotas,
@@ -543,8 +543,11 @@ export type ReturnableItem = {
 /**
  * Lines this employee could send back.
  *
- * Only shipped or delivered orders: something that has not left the building is
- * a cancellation, not a return, and goes through the customer admin instead.
+ * Only orders that have actually left: something still in the building is a
+ * cancellation, not a return, and goes through the customer admin instead.
+ * "Left" is the dispatch timestamp rather than a status, because dispatch does
+ * not move an order (Q-C2 c) — `delivered` is still included for orders that
+ * went out before the timestamp existed.
  */
 export async function listReturnableItems(
   organisationId: string,
@@ -570,7 +573,7 @@ export async function listReturnableItems(
       and(
         eq(orders.memberId, memberId),
         eq(orders.organisationId, organisationId),
-        inArray(orders.status, ["shipped", "delivered"]),
+        or(isNotNull(orders.dispatchedAt), eq(orders.status, "delivered")),
       ),
     )
     .orderBy(desc(orders.createdAt))

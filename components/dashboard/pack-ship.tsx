@@ -3,11 +3,12 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Package, Truck } from "lucide-react";
 import {
+  dispatchOrderAction,
   moveOrderAction,
-  shipOrderAction,
 } from "@/app/[lang]/dashboard/fulfilment-actions";
 import { ActionMessage } from "./action-message";
 import { isLogoPlacement, type LogoPlacement } from "@/lib/shop/logo";
+import { canDispatch } from "@/lib/production";
 import type { PackOrder } from "@/lib/db/queries/production";
 import type { Dictionary } from "@/lib/i18n";
 
@@ -17,10 +18,15 @@ type PlacementLabels = Record<LogoPlacement, string>;
 /**
  * One order in the warehouse queue.
  *
- * The gate that matters: an order cannot start packing until every line's
- * variant has enough stock to cover it. The prototype checks the same thing
- * before letting a picker start — sending someone to the aisle for goods that
- * have not arrived is the failure this screen exists to prevent.
+ * The four stages come from D-3: goods are booked with the supplier, ARRIVE,
+ * are decorated if the order carries a logo, and are delivered. Dispatch sits
+ * across that as an event (Q-C2 c) — scanning the parcel stamps the number and
+ * the timestamp without moving the order, so an order can be with GLS and
+ * still not be "Leveret".
+ *
+ * The gate that matters: an order cannot be received until the supplier feed
+ * says the goods exist. Booking something in as arrived when the supplier has
+ * not shipped it is what makes the rest of the board a guess.
  */
 export function PackOrderCard({
   order,
@@ -38,6 +44,7 @@ export function PackOrderCard({
   const [scanning, setScanning] = useState(false);
 
   const blocked = !order.readyToPick;
+  const dispatched = order.dispatchedAt !== null;
 
   return (
     <article className="rounded-lg border border-border bg-card">
@@ -115,16 +122,16 @@ export function PackOrderCard({
           </table>
         </div>
 
-        {blocked && order.status === "approved" ? (
+        {blocked && order.status === "booked" ? (
           <p className="mt-4 rounded-md border border-warning/30 bg-warning/5 px-3.5 py-2.5 text-sm text-ink-800">
             {dict.blocked}
           </p>
         ) : null}
 
-        {order.status === "shipped" ? (
+        {dispatched ? (
           <p className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-success/30 bg-success/5 px-3.5 py-2.5 text-sm text-success">
             <Truck className="size-4" />
-            {dict.shipped} · GLS {order.glsParcelNumber}
+            {dict.dispatched} · GLS {order.glsParcelNumber}
             {order.glsTrackUrl ? (
               <a
                 href={order.glsTrackUrl}
@@ -139,52 +146,64 @@ export function PackOrderCard({
         ) : null}
 
         {/* Actions per stage. Each is a plain submit so it works without JS. */}
-        {order.status !== "shipped" ? (
-          <form action={moveAction} className="mt-4 flex flex-wrap gap-2">
-            <input type="hidden" name="orderId" value={order.id} />
+        <form action={moveAction} className="mt-4 flex flex-wrap gap-2">
+          <input type="hidden" name="orderId" value={order.id} />
 
-            {order.status === "approved" ? (
-              order.needsDecoration ? (
-                <Action
-                  to="in_production"
-                  label={dict.toPrint}
-                  pending={moving}
-                  pendingLabel={dict.moving}
-                  disabled={blocked}
-                />
-              ) : (
-                <Action
-                  to="packing"
-                  label={dict.startPacking}
-                  pending={moving}
-                  pendingLabel={dict.moving}
-                  disabled={blocked}
-                />
-              )
-            ) : null}
+          {order.status === "booked" ? (
+            <Action
+              to="arrived_at_warehouse"
+              label={dict.toArrived}
+              pending={moving}
+              pendingLabel={dict.moving}
+              disabled={blocked}
+            />
+          ) : null}
 
-            {order.status === "in_production" ? (
-              <Action
-                to="packing"
-                label={dict.printDone}
-                pending={moving}
-                pendingLabel={dict.moving}
-              />
-            ) : null}
+          {order.status === "arrived_at_warehouse" && order.needsDecoration ? (
+            <Action
+              to="sent_to_print"
+              label={dict.toPrint}
+              pending={moving}
+              pendingLabel={dict.moving}
+            />
+          ) : null}
 
-            {order.status === "packing" ? (
-              <Action
-                to="in_production"
-                label={dict.back}
-                pending={moving}
-                pendingLabel={dict.moving}
-                quiet
-              />
-            ) : null}
-          </form>
-        ) : null}
+          {/*
+            * Delivered is the customer holding the parcel, so it only becomes
+            * available once one has actually gone — and it is a manual step
+            * only until GLS can tell us itself.
+            */}
+          {dispatched ? (
+            <Action
+              to="delivered"
+              label={dict.markDelivered}
+              pending={moving}
+              pendingLabel={dict.moving}
+            />
+          ) : null}
 
-        {order.status === "packing" ? (
+          {order.status === "arrived_at_warehouse" ? (
+            <Action
+              to="booked"
+              label={dict.back}
+              pending={moving}
+              pendingLabel={dict.moving}
+              quiet
+            />
+          ) : null}
+
+          {order.status === "sent_to_print" ? (
+            <Action
+              to="arrived_at_warehouse"
+              label={dict.back}
+              pending={moving}
+              pendingLabel={dict.moving}
+              quiet
+            />
+          ) : null}
+        </form>
+
+        {canDispatch(order.status) && !dispatched ? (
           <div className="mt-3">
             {scanning ? (
               <ScanForm
@@ -244,11 +263,14 @@ function Action({
 }
 
 /**
- * GLS scan.
+ * GLS scan — the dispatch event.
  *
  * The input takes focus on open because a handheld scanner types the code and
  * presses Enter — if focus is anywhere else, the scan lands in nothing and the
  * picker reaches for the keyboard.
+ *
+ * Submitting does NOT move the order: it records the parcel number and the
+ * dispatch time (Q-C2 c), and it is the moment D-5 hangs the invoice on.
  */
 function ScanForm({
   orderId,
@@ -259,7 +281,7 @@ function ScanForm({
   dict: Dict;
   onCancel: () => void;
 }) {
-  const [state, formAction, pending] = useActionState(shipOrderAction, null);
+  const [state, formAction, pending] = useActionState(dispatchOrderAction, null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

@@ -61,9 +61,10 @@ There **is** a public, unauthenticated front to the site, matching the look and 
 
 **Consequences**
 - §3.1's "Guest" is **not** a sixth role. Every "six roles" statement in this document should be read as *five roles plus an unauthenticated front*. `DEV §4.1`'s five-role definition was right.
-- `EMPLOYEE-SHOP.md`'s prohibitions (*"no public catalogue, no guest checkout, no search engine indexing"*) apply to the **employee shop**, not to the site. The public front may show indicative prices; the employee shop stays private.
+- `EMPLOYEE-SHOP.md`'s prohibitions (*"no public catalogue, no guest checkout, no search engine indexing"*) apply to the **employee shop**, not to the site.
+- ⚠ **Corrected by §0b.1:** the live site shows the **catalogue publicly but no prices at all** — *"Du skal være logget ind for at kunne lave bestillinger."* An earlier draft of this decision said the front "may show indicative prices"; the running business does not. See **Q-A2**.
 - The public front is a **new build surface**. Nothing in the current implementation serves it.
-- Open: the existing site is cited here as `profildesign.dk`; earlier documents say `profildesigntrading.dk`. Confirm which domain the look and feel is taken from.
+- ✅ **Resolved by §0b:** the live site is **`profildesigntrading.dk`**. Staff email is on `profiltrading.dk`; a separate back office runs at `profildesignadmin.dk`.
 
 ## D-2 · Approval is one step *(answers Q-B, closes conflict C-2)*
 
@@ -91,16 +92,18 @@ The single authoritative list for `orders.status`, used everywhere — employee 
 
 **This is a different shape from anything previously documented**, and materially different from what is built. Note stage 2: goods **arriving from the supplier** is now a customer-visible stage. That implies PDT buys in per order rather than shipping from held stock — see the note under §16.2 Q-I.
 
-**Consequences — this contradicts working code**
+**Consequences — this contradicted working code. ✅ MIGRATED 2026-08-30.**
 
-| Built today | Under D-3 |
+| Was built | Now |
 |---|---|
-| `order_status` enum: `draft · pending_approval · approved · in_production · packing · shipped · delivered · cancelled · refunded` | Four stages, none of which is `packing` or `shipped` |
-| `lib/production.ts` `STAGES` = `approved → in_production → packing → shipped → delivered` | A different list, in a different order |
-| Production board columns, Pack & ship queue, employee order tracker | All read the old list |
+| `order_status` enum: `draft · pending_approval · approved · in_production · packing · shipped · delivered · cancelled · refunded` | `pending_approval · booked · arrived_at_warehouse · sent_to_print · delivered · cancelled · rejected · refunded` |
+| `lib/production.ts` `STAGES` = `approved → in_production → packing → shipped → delivered` | `booked → arrived_at_warehouse → sent_to_print → delivered` |
+| Production board columns, Pack & ship queue, employee order tracker | All read the four stages |
+
+Migration `drizzle/0005_order_stages.sql` maps the old rows: `draft`→`pending_approval`, `approved`→`booked`, `in_production`→`sent_to_print`, and `packing`/`shipped` by whether the order carries decoration (`sent_to_print` if it does, `arrived_at_warehouse` if not). A `shipped` row with a parcel number also gets `dispatched_at`.
 
 - The old order also differs: it decorated, then packed, then shipped. D-3 receives goods **first**, then decorates. That is coherent for a buy-in-per-order model and the old model simply lacked the receiving step.
-- **⚠ One thing D-3 does not resolve — see Q-C2 below.** The four stages contain no dispatch state, yet D-5 hangs the invoice on the GLS label. That has to be settled before this can be implemented.
+- **⚠ One thing D-3 did not resolve — see Q-C2 below.** The four stages contain no dispatch state, yet D-5 hangs the invoice on the GLS label. ✅ **Settled: Q-C2 (c)** — dispatch is an event, stamped on `orders.dispatched_at`.
 
 ## D-4 · No mandatory proof gate *(answers Q-D, closes conflict C-4)*
 
@@ -122,7 +125,7 @@ The invoice is raised **when the GLS label / barcode is created** in pack-and-sh
 - The prototype's invoice-at-checkout (`PROTO:confirmSplit` → `createInvoice(..., 'Bogført')`) is **wrong** and must not be carried over.
 - `PROTO:samlefaktura` (daily batch consolidation) is **not** the invoicing model. Whether it survives as an optional consolidation for large customers is undecided — currently out of scope.
 - Confirms `PRD FR-5.2`'s "upon order dispatch".
-- The trigger lives in the same action that writes the parcel number — today `shipOrderAction` in `app/[lang]/dashboard/fulfilment-actions.ts`.
+- The trigger lives in the same action that writes the parcel number — today `dispatchOrderAction` in `app/[lang]/dashboard/fulfilment-actions.ts`, where it is marked `TODO(invoice)`. **No invoice is raised yet: there is no `invoices` table and no e-conomic client, so the moment is named rather than faked.**
 - **Depends on Q-C2:** "dispatch" must correspond to an identifiable moment in the four-stage list.
 
 ## D-6 · Returns have an owner *(answers Q-F, closes the §13.4 dead end)*
@@ -145,7 +148,7 @@ The invoice is raised **when the GLS label / barcode is created** in pack-and-sh
 
 ## Follow-up raised by these decisions
 
-### ⚠ Q-C2 · Where does dispatch sit in the four stages? — **blocking**
+### ✅ Q-C2 · Where does dispatch sit in the four stages? — **answered 2026-08-30: (c)**
 
 D-3 gives four stages with no dispatch/shipped state. D-5 raises the invoice at GLS label creation. `WAREHOUSE.md` requires that *"shipping requires a parcel number"* and that *"nothing moves back out of shipped."* Those cannot all hold unless dispatch is locatable.
 
@@ -155,15 +158,286 @@ D-3 gives four stages with no dispatch/shipped state. D-5 raises the invoice at 
 | **(b)** A fifth stage sits between 3 and 4 | e.g. *Sendt* / dispatched | Contradicts "exactly four" |
 | **(c)** Dispatch is an event, not a stage | The parcel number and invoice are stamped without changing status; `Delivered` is set on GLS confirmation | Keeps four customer-visible stages and an accurate one. Needs a dispatch timestamp column |
 
-**Recommendation: (c).** It preserves the four stages exactly as decided, keeps "Leveret" honest for the customer, and gives the invoice a precise trigger. It costs one timestamp column.
+**Answered: (c).** Dispatch is an event. It preserves the four stages exactly as decided, keeps "Leveret" honest for the customer, and gives the invoice a precise trigger.
 
-### Q-C3 · Which non-happy-path states survive?
+**Built as:** `orders.dispatched_at` (timestamptz, null until the parcel goes). `dispatchOrderAction` writes the parcel number, the tracking URL and the timestamp **without changing `status`**. `delivered` is refused while `dispatched_at` is null — enforced on the server, not just by hiding the button. Marking delivered is a manual step until a GLS delivery webhook exists (`TODO(gls)` in `lib/production.ts`).
+
+### ✅ Q-C3 · Which non-happy-path states survive? — **answered 2026-08-30: as proposed**
 
 `orders.status` cannot be only four values in practice. At minimum:
 - **`pending_approval`** — D-2 requires an order to wait for a decision
 - **`cancelled`** / **`rejected`** — D-5 explicitly refers to *"cancellation/rejection before dispatch"*
 
-Proposal: the four stages are the **customer-visible happy path**; the enum also carries `pending_approval`, `cancelled` and `rejected`, which the tracker renders as an interruption rather than a step. **Needs confirmation.**
+**Confirmed:** the four stages are the **customer-visible happy path**; the enum also carries `pending_approval`, `cancelled` and `rejected`, which the tracker renders as an interruption rather than a step.
+
+`refunded` was **kept** rather than added — it already existed, D-6 gives refunds an owner, and dropping the value would discard any order sitting in it. Whether a refund finally lives on `orders.status` or on a `returns` row is still open. `draft` was dropped: nothing ever wrote it.
+
+
+---
+
+# 0b. The live public site — what was found
+
+**Explored 2026-08-27 at `https://profildesigntrading.dk/`** — the real, running site D-1 says the new platform should match. It is a **live B2B e-commerce site on DanDomain Webshop**, not a brochure. Everything below is `[C]` observed directly, and several findings **correct D-1 as recorded above**.
+
+## 0b.1 ⚠ Corrections to D-1
+
+### Prices are NOT public
+
+The catalogue is fully browsable without signing in — names, images, descriptions, EN certifications, brands, variants and SKUs. **No price appears anywhere.** A product page instead shows:
+
+> **"Du skal være logget ind for at kunne lave bestillinger"** — *you must be logged in to place orders*
+
+The variant matrix (Varer · Pris · Note · Antal) renders every colour and size with the **Pris and Antal columns empty**. Verified: zero price patterns in the anonymous DOM.
+
+| Where this document says | The live site does |
+|---|---|
+| §3.1 Guest *"Can do: browse a public product grid… **indicative prices**"* | Browse yes — **prices no** |
+| §4.1 *"View public indicative prices — ✔ for everyone"* | Catalogue public, **prices behind login** |
+| D-1 *"The public front may show indicative prices"* | ❌ **It does not** |
+| `PROTO:pubshop` renders 40 products **with prices** | ❌ Does not match the real site |
+
+**The rule the real business runs on: the catalogue is marketing; the price is the relationship.** That is a stronger and more defensible position than the prototype's, and it is what "match the look and feel" should mean here.
+
+> ⏳ **Still open — see §0c.** The answer given was *"not sure, that data might be coming from APIs."* That instinct is right, and the supplier contracts narrow it: **BR-39a makes PF Concept's prices contractually confidential**, so publishing a supplier-derived price on an unauthenticated page is disclosure to a third party. Safe options are **no public prices** (as today) or **RRP only, per supplier, on an allow-list** — never a dealer or net price.
+
+### The domain is `profildesigntrading.dk`
+
+D-1 cited `profildesign.dk`. The live site is **`profildesigntrading.dk`**; staff email is on **`profiltrading.dk`**; and the admin system is on a third domain (below). ✅ Resolves the domain question raised under D-1.
+
+## 0b.2 A self-service B2B application already exists — and W-10 was wrong
+
+`/ansoeg-om-bruger/` — **"Ansøg om bruger (B2B)"**, linked from the top bar of every page as *"Ansøg om b2b login"*.
+
+> *"Denne formular er forbeholdt kunder som ønsker B2B forhandler log ind."*
+
+| Field | Required |
+|---|---|
+| Firmanavn | ✔ |
+| **CVR-nummer** | ✔ |
+| **EAN-nummer** | — |
+| Fornavn · Efternavn | ✔ |
+| Adresse · Postnummer · By · Land | ✔ |
+| E-mail | ✔ |
+| Telefonnr. | — |
+| **Adgangskode + confirm** | ✔ |
+| Nyhedsbrev opt-in · reCAPTCHA | — |
+
+Countries offered: **Danmark · Schweiz · Tyskland**.
+
+**Why this matters.** §8.10 W-10 records the public-enquiry route as ending nowhere: *"The enquiry reaches a KAM — `[U]` no inbox, assignment rule or lead entity is specified anywhere."* **It is specified — it exists and is running.** The real flow is a self-service application that captures exactly the stamdata W-1 step 2 asks a KAM to type in, and **the applicant sets their own password at application time**.
+
+That inverts the onboarding model this document assumed:
+
+| §8.1 W-1 assumes | The live site does |
+|---|---|
+| A KAM creates the company from scratch | **The customer applies for themselves**, with CVR and EAN |
+| The KAM invites the admin, who sets a password | **The applicant sets their own password up front** |
+| The lead arrives by an unspecified route | A form, on every page, gated by reCAPTCHA |
+
+> ✅ **Answered — D-8: keep the self-service application.** `organisations` gains an **applied / pending-approval** state before Draft, and a review queue is needed. Two follow-ups remain: **Q-A3a** (does the applicant get an auth account before approval?) and **Q-A3b** (who approves — KAM, admin, or either?).
+
+## 0b.3 A third system: `profildesignadmin.dk`
+
+The public header carries an **Admin** button pointing at **`https://profildesignadmin.dk/login`** — a separate, live back-office on its own domain.
+
+The prototype already referenced it: `PROTO:regnskab` describes a *"Live-feed fra profildesignadmin.dk — ordrer kunder lægger via webshoppen synkroniseres direkte til Showme."*
+
+This is a concrete lead on `DEV` **Q1** (*"Which ERP/order system does PDT run today?"*), which this document still lists as unanswered.
+
+> ✅ **Partly answered — D-9: the platform carries its own admin dashboard**, much of it already built. Still open: **Q-A4b** — nobody has looked inside `profildesignadmin.dk`, so we cannot yet say whether ours covers its function; and **Q-A4c** — is it decommissioned at cutover, or does it run alongside?
+
+## 0b.4 Catalogue scale — larger than any planning figure so far
+
+**1,878 products in Arbejdstøj alone**, paginated 48 to a page, with search, a price-range slider and manufacturer facets.
+
+Brands carried, read off the live facet list:
+
+**Blåklæder · Craft · Cutter & Buck · F. Engel · Fristads · ID · J. Harvest & Frost · Mascot Workwear · Projob Workwear · Snickers workwear**
+
+Five appear in `SUP-INT` (Engel, Fristads, ID Identity, Mascot, Snickers). **Five do not: Blåklæder, Craft, Cutter & Buck, J. Harvest & Frost, Projob.** The header also co-brands **New Wave Profile**, consistent with the NWG Gateway integration.
+
+> ✅ **Answered — D-10: in scope.** And the gap is smaller than it looked: **four of the five are New Wave Group brands** and very likely already arrive through the NWG Gateway (`SUP-INT` names *Harvest* explicitly). **Blåkläder is the one genuine gap.** This makes the NWG token + `assortmentId` the highest-value blocked item in Appendix B — one credential unlocks six brands.
+
+## 0b.5 Real people, real places — assumption A-2 is partly wrong
+
+The footer lists actual staff and addresses:
+
+| | |
+|---|---|
+| **Frederik Kjærulff** | 40 19 34 04 · Fkj@profiltrading.dk |
+| **Allan Berthelsen** | 40 19 24 35 · Allan@profiltrading.dk |
+| Showrooms | Bugattivej 9, 7100 Vejle · Snaremosevej 23F, 7000 Fredericia · Bredgade 13a, 6900 Skjern · Montanavej 9, 7190 Billund |
+| Payment | VISA · Mastercard · **MobilePay** |
+
+**A-2 said the prototype's names are demo fixtures.** For the *customers* that holds. For **Frederik Kjærulff** and **Allan Berthelsen** it does not — the prototype's KAM persona and pipeline owners are **real employees**. A-2 is corrected accordingly.
+
+MobilePay is already live on the current site, which de-risks D-5's payment leg.
+
+## 0b.6 The visual identity — and how far the build has drifted from it
+
+Measured from the live DOM:
+
+| Token | Live site |
+|---|---|
+| Typeface | **Barlow** — one family throughout |
+| Headings | 800 weight, **uppercase**, tight leading |
+| Body | 18px |
+| Ink | `#1c1c1c` |
+| Ground | `#ffffff`; greys `#f4f4f4` · `#f3f3f3` · `#eeeeee` |
+| Secondary ink | `#212121` · `#4a4a4a` · `#787878` |
+| Accent | **`#577756`** — a single muted forest green, used sparingly |
+| Chrome | Charcoal header and footer, near-black |
+| Corners | Square — `border-radius: 0` |
+| Platform | DanDomain Webshop |
+
+**⚠ This is not what has been built.** The implementation currently uses the "Nordic Workwear" direction from `docs/brand-guidelines.md`:
+
+| | Live site | Implementation today |
+|---|---|---|
+| Typeface | Barlow | display + body pair from the brand doc |
+| Accent | muted green `#577756` | **high-vis orange `#f26522`** |
+| Ground | white + light greys | bone `#fbfaf7` |
+| Corners | square | rounded (4 / 8 / 14px) |
+
+`PRD §2.2` is a third answer again — *"Accent Gold `#d4af37`"*, Inter. And `HAND` notes *"grøn brandfarve; vi rullede tilbage fra et sort/hvidt forsøg"* — a green brand colour, after rolling back a black-and-white attempt. The live green corroborates `HAND`.
+
+> ✅ **Answered — D-7: keep Nordic Workwear.** Nothing built has to be re-skinned. D-1's *"match that look and feel"* means the public front's **structure and behaviour**, not its visual identity. The new platform will deliberately not look like today's site.
+
+## 0b.7 Navigation the public front must carry
+
+**Top bar:** Priserne vises ekskl. moms · Hurtig service of levering · Kæmpe sortiment · Sikker betaling · Kundeservice 22 56 79 80 · social · **Login · Ansøg om b2b login · Admin**
+
+**Categories:** Profiltøj · Arbejdstøj · Fodtøj · Firmagaver · Reklame artikler — each with a sub-menu. Firmagaver is banded **by price point** (Gave 200 / 300 / 400 / 560 / 640 / 800 / 1040), which is a gift-buying pattern nothing in this document mentions.
+
+**Utilities:** Info · Konto · Favoritter · Kurv · search
+
+**Footer:** Om os · Kontakt · Handelsbetingelser · Webshop · Kataloger · Brands · Størrelsesguide
+
+Two of these already exist in the build (**Størrelsesguide**, **Favoritter** in the prototype). **Kataloger** — downloadable brand catalogues, one seen as a Joomag flipbook — is a public-front feature with no equivalent anywhere in this document.
+
+## 0b.8 Summary of what this exploration changed
+
+| # | Finding | Effect |
+|---|---|---|
+| 1 | Prices hidden until login | **Corrects D-1**, §3.1, §4.1 → Q-A2 |
+| 2 | Self-service B2B application exists | **Corrects W-10 and W-1** → Q-A3 |
+| 3 | `profildesignadmin.dk` is a live back office | Lead on `DEV` Q1 → Q-A4 |
+| 4 | 1,878 products in one category; 15+ brands | Five brands unmapped → Q-A5 |
+| 5 | Frederik and Allan are real employees | **Corrects A-2** |
+| 6 | Barlow · charcoal · `#577756` · square | **Conflicts with what is built** → Q-A6 |
+| 7 | Domain is `profildesigntrading.dk` | ✅ Resolves the D-1 domain question |
+| 8 | Firmagaver banded by price; Kataloger section | New public-front scope |
+
+
+---
+
+# 0c. Second round of decisions
+
+**Recorded 2026-08-27, after exploring the live site.** Five answers to the questions §0b raised. Same `[DEC]` weight as §0.
+
+## D-7 · Keep the Nordic Workwear identity *(answers Q-A6)*
+
+The platform **keeps** the `docs/brand-guidelines.md` direction already built — ink/bone/high-vis, rounded corners. It does **not** adopt the live site's Barlow · charcoal · `#577756` · square.
+
+**This narrows what D-1 means.** *"Match that look and feel"* refers to the public front's **structure and behaviour** — a public catalogue, category navigation, a login and a B2B application route — **not** its visual identity. The new platform is a visual departure from `profildesigntrading.dk` by choice.
+
+**Consequences**
+- ✅ **Nothing built has to be re-skinned.** §0b.6's conflict is closed in favour of the implementation.
+- `PRD §2.2`'s *"Accent Gold `#d4af37`"* and Inter remain superseded by `brand-guidelines.md`, as they already were.
+- The public front, when built, uses Nordic Workwear — so it will not look like today's site. Worth saying out loud to whoever signs it off, because "match the look and feel" could be read the other way by a stakeholder who has not seen this decision.
+
+## D-8 · Keep the self-service B2B application *(answers Q-A3)*
+
+The public front keeps the **customer-applies-for-themselves** model observed at `/ansoeg-om-bruger/`. A company submits its own details; PDT reviews and approves.
+
+**This rewrites W-1.** Onboarding no longer starts with a KAM creating a company from scratch — it starts with an inbound application:
+
+```
+Public visitor
+   └─► Applies: Firmanavn · CVR · EAN · contact · address · email · phone
+        └─► Application lands in a review queue
+             └─► KAM (or admin) approves ──► organisation created
+                  └─► KAM sets range, prices, logo, rules   (W-1 steps 3–6, unchanged)
+                       └─► Customer admin invited
+   └─► Rejected ──► applicant told; no organisation created
+```
+
+**Consequences**
+- `organisations` needs a state **before** Draft — `applied` / `pending_approval`. §7.1's lifecycle grows a step at the front.
+- A **review queue** is needed. It does not exist on any dashboard. Likely the KAM's, with platform-admin visibility.
+- W-1's step 2 (a KAM typing stamdata) becomes **reviewing** stamdata the applicant already supplied. CVR auto-lookup (`PRD FR-1.1`) moves to the public form, where it is more valuable — it validates the applicant's own entry.
+- **Who approves is not stated.** KAM, platform admin, or either? → **Q-A3b**.
+
+### ⚠ Q-A3a — the applicant sets a password before anyone approves them
+
+The live form takes **Adgangskode + confirm** at application time. That does not fit the invite-based auth this platform uses, and it has a security dimension worth deciding deliberately.
+
+| Option | How it works | Trade-off |
+|---|---|---|
+| **(a) Lead record only** | The application is stored as data. **No auth account.** On approval, the normal Supabase invite goes out and they set a password then. | **Safest** — an unapproved stranger never holds an account. Costs the applicant a second step, and differs from today's UX. |
+| **(b) Account created, no role** | A real auth account exists immediately with no role and no organisation. They can sign in and see *"your application is being reviewed."* | Matches today's UX exactly. But unapproved accounts accumulate, and every RLS policy must be safe against a roleless token. |
+
+**Recommendation: (a).** A password must never be held in a pending-applications table, and (b) means an unreviewed applicant is already inside the auth system. The extra click at approval time is a small price. **Not yet decided.**
+
+## D-9 · The platform has its own admin dashboard *(answers Q-A4)*
+
+PDT's back office lives **in this platform**. It is not deferred to `profildesignadmin.dk`.
+
+**Already built** under `/dashboard/admin`: Prissætning · Opret kundeshop · Kunder · Produktionsflow · Ordre & leverandør · Leverandører · Team & adgang, plus `/dashboard/warehouse` for Pak & send.
+
+**Consequences and what is still open**
+- Consistent with `SUP-INT`'s *"Rackbeat is discontinued. Stock and orders live in the platform itself."*
+- ⚠ **We still do not know what `profildesignadmin.dk` actually does.** Until someone looks inside it, we cannot say whether the admin dashboard covers its function. It is a live system with real users. → **Q-A4b: get a walkthrough or an account.**
+- Whether it is **decommissioned** at cutover or **runs alongside** during transition is undecided → **Q-A4c**. That decides whether the two need to stay in sync, which is a different and much larger piece of work.
+
+## D-10 · The five extra brands are in scope *(answers Q-A5)*
+
+Blåklæder, Craft, Cutter & Buck, J. Harvest & Frost and Projob — sold on the live site, absent from `SUP-INT` — are **in scope**.
+
+### Four of the five are probably already mapped
+
+`SUP-INT` states the NWG Gateway *"covers New Wave brands (New Wave Profile, Cottover, Clique, **Harvest**, Printer, Tenson, etc.)"*. New Wave Group also owns Craft, Cutter & Buck and Projob.
+
+| Brand | Route | Confidence |
+|---|---|---|
+| **J. Harvest & Frost** | NWG Gateway — *"Harvest"* is named explicitly | `[C]` |
+| **Craft** | NWG Gateway — New Wave Group brand, inside the *"etc."* | `[I]` high |
+| **Cutter & Buck** | NWG Gateway — New Wave Group brand | `[I]` high |
+| **Projob** | NWG Gateway — New Wave Group brand | `[I]` high |
+| **Blåklæder** (Blåkläder) | **Independent Swedish manufacturer — genuinely unmapped** | `[C]` |
+
+**Consequences**
+- The gap is **one supplier, not five**. Blåkläder needs its own integration conversation: data channel, order channel, credentials.
+- **The NWG `assortmentId` just became the highest-value blocked item in Appendix B.** One token and one assortment id unlock Cottover, Clique, Craft, Cutter & Buck, Harvest and Projob — six brands through one pipe. It is currently listed as merely *"blocked on them"*.
+- Confirm the four NWG brands against the actual assortment when the token arrives. If any is licensed separately, it returns to the unmapped list.
+
+## Q-A2 · Public prices — still open, and now narrower
+
+Answer given: *"not sure — that data might be coming from APIs."*
+
+That uncertainty is well founded, and the supplier contracts settle part of it.
+
+### ⚠ A public price may breach a supplier agreement
+
+**BR-39a**, from `SUP-INT`: PF Concept's *"feed URLs, **prices** and stock are confidential and must not be disclosed to third parties; the feed URL may be shared with a webshop provider only as needed."*
+
+**Publishing a supplier-derived price on an unauthenticated page is disclosure to third parties.** For PF Concept that is a contractual problem, not a design preference. Fristads' refusal to publish CO₂ *"citing data-theft risk"* points the same way — these suppliers treat feed data as commercially sensitive.
+
+That is very likely **why the live site shows no prices**, and it makes today's behaviour the safe default rather than a limitation.
+
+### If public prices are wanted anyway, the distinction that makes it safe
+
+Supplier feeds carry several price fields. The You feed alone has *"standard / RRP / dealer / net + discount"*.
+
+| Field | Publishable? |
+|---|---|
+| **RRP / list / standard** | ✅ The manufacturer's own recommended retail price — already public by design |
+| **Dealer / net / cost** | ❌ **Never.** PDT's negotiated buying price. Publishing it discloses PDT's margin and breaches BR-39a |
+| **Customer net price** | ❌ Per-customer and confidential — behind login by definition |
+
+**Recommendation:** either keep the live site's behaviour (no public prices — safest, matches current practice), or publish **RRP only**, per supplier, with an explicit allow-list — never a price derived from a dealer or net field.
+
+> **Q-A2, restated so it can be answered:** should the public front show **no prices** (as today), or **RRP only** where the supplier permits republication? The second needs a per-supplier check of what may be published, and a schema that keeps RRP and dealer price clearly apart. It should not be answered until that check is done.
 
 ---
 
@@ -218,7 +492,7 @@ Public enquiry ──► KAM creates customer, range, prices, logo ──► inv
 |---|---|---|
 | ~~**Q-A**~~ | **Is there a public shop?** | ✅ **Answered — D-1.** Yes. Guest is not a role; it is the unauthenticated front. Five authenticated roles. |
 | ~~**Q-B**~~ | **How many approval steps?** | ✅ **Answered — D-2.** One, by the company admin. Decision kept and logged; reason mandatory on rejection. |
-| ~~**Q-C**~~ | **What are the order stages?** | ✅ **Answered — D-3.** Booked → Arrived at warehouse → Sent to print/embroidery → Delivered. **⚠ Raises Q-C2 and Q-C3.** |
+| ~~**Q-C**~~ | **What are the order stages?** | ✅ **Answered — D-3.** Booked → Arrived at warehouse → Sent to print/embroidery → Delivered. **Q-C2 and Q-C3 answered; migrated 2026-08-30.** |
 | ~~**Q-D**~~ | **Is a visual proof mandatory?** | ✅ **Answered — D-4.** No. No blocking proof gate. |
 | ~~**Q-E**~~ | **When is the invoice raised?** | ✅ **Answered — D-5.** At dispatch, when the GLS label is created. None raised on cancellation before dispatch. |
 
@@ -263,7 +537,7 @@ A Next.js implementation exists in this repository and is materially further alo
 |---|---|
 | **Prototype id** | `gaest` — "Offentlig adgang · vejledende priser" |
 | **Purpose** | Let a prospective customer see the range and indicative prices, put their logo on a garment, and ask for a quote. |
-| **Can do** | Browse a public product grid; use the size guide; use the logo visualiser; request a quote. `[C]` PROTO:`pubshop`, `NAV.gaest` |
+| **Can do** | Browse the full public catalogue **without prices**; use the size guide; **apply for a B2B login** (`/ansoeg-om-bruger/`). `[C]` §0b — observed on the live site |
 | **Cannot do** | See any customer's agreed prices; order anything; see cart or favourites (removed for guests in the audit). `[C]` REV §2 |
 | **Status** | ✅ **RESOLVED — D-1.** The public front **exists** and matches the look and feel of the current public site. It is **not a role**: it is the unauthenticated front from which people sign in. `EMP`'s prohibitions govern the employee shop, not the site. |
 
@@ -351,7 +625,7 @@ Legend: **✔** allowed · **✘** denied · **~** conditional (see note) · **?
 | Capability | Guest | Employee | Cust. Admin | KAM | Warehouse | Platform Admin | Evidence |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|---|
 | **Catalogue & shop** |
-| View public indicative prices | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | `[C]` PROTO:`pubshop` — **disputed, see Q-A** |
+| Browse the public catalogue *(no prices)* | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✅ `[C]` §0b.1 — catalogue public, **prices behind login** |
 | View own company's range & prices | ✘ | ✔ | ✔ | ~ | ✘ | ✔ | `[C]` KAM sees only their own customers |
 | View another company's prices | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ | `[C]` CA/KAM "Must not"; PA §5 |
 | View PDT cost price / margin | ✘ | ✘ | ✘ | ~ | ✘ | ✔ | `[C]` PA rule 5. KAM sees margin **for their own customers only** |
@@ -364,7 +638,7 @@ Legend: **✔** allowed · **✘** denied · **~** conditional (see note) · **?
 | Start a return | ✘ | ✔ | ? | ✘ | ✘ | ✔ | `[C]` PROTO:`retur`; CA's role in returns `[U]` |
 | **Approvals** |
 | Approve / reject an order | ✘ | ✘ | ✔ | ✘ | ✘ | ✔ | `[C]` CA §4 |
-| Approve a visual proof | ✘ | ~ | ~ | ✘ | ✘ | ✔ | **Contested** — see §8.4 and Q-D |
+| ~~Approve a visual proof~~ | — | — | — | — | — | — | ✅ `[DEC]` D-4 — **no proof gate; out of scope** |
 | **People** |
 | Invite an employee | ✘ | ✘ | ✔ | ✘ | ✘ | ✔ | `[C]` DEV §4.3, CA §1 |
 | Bulk-import employees (CSV) | ✘ | ✘ | ✔ | ✘ | ✘ | ✔ | `[C]` CA §B, PROTO:`importModal` |
@@ -492,6 +766,16 @@ A third value, **Kladde** (draft), appears in the customer list but nothing in t
 
 **Documented behaviour** `[D]` KAM §A: **Draft · Ready · Live · Paused**, with an explicit *"Go live"* switch and a *"pause"* action distinct from deletion (*"A KAM cannot delete a live customer. They can pause it"*).
 
+**⚠ D-8 adds a state at the front.** An inbound application exists before any organisation does:
+
+```
+APPLIED ──approve──► DRAFT ──► READY ──► LIVE ──► PAUSED
+   │
+   └──reject──► (told; no organisation created)
+```
+
+Whether `applied` is a state on `organisations` or a separate `applications` table is undecided. A separate table is cleaner — a rejected application should not leave a dead organisation row behind — but it duplicates the stamdata fields. **Needs deciding with Q-A3a.**
+
 > **⚠ Conflict.** Three-state prototype (Kladde/Pipeline/Aktiv, driven by *first order registered*) versus four-state specification (Draft/Ready/Live/Paused, driven by *an explicit go-live switch*). They are not reconcilable: one makes activation a **sales milestone**, the other a **deliberate configuration act**. **Stakeholder decision required.**
 
 ## 7.2 Order — four competing stage models
@@ -509,7 +793,7 @@ A third value, **Kladde** (draft), appears in the customer list but nothing in t
 
 Six renderings, no two identical. They disagree on: whether **Proofing** is a stage; whether **Delivered** exists; whether **Ready/Klar** is a stage or a substate of packing; and whether packing precedes or follows print.
 
-> ✅ **Resolved by D-3** — and the answer was none of the six. Two follow-ups remain before it can be built: **Q-C2** (where dispatch sits) and **Q-C3** (which non-happy-path states survive). Both in §0.
+> ✅ **Resolved by D-3** — and the answer was none of the six. Both follow-ups are answered too: **Q-C2 (c)** dispatch is an event, and **Q-C3** yes to the non-happy-path states. Built on 2026-08-30.
 
 **What is consistent across all sources** `[C]`:
 - Print/embroidery, packing and shipping happen in that order.
@@ -571,7 +855,7 @@ INVITED ──► ACTIVE ──► DEACTIVATED
 | | |
 |---|---|
 | **Purpose** | Turn an enquiry into a company whose employees can order. |
-| **Trigger** | A public quote request, or a KAM's own sales contact. `[C]` KAM |
+| **Trigger** | ⚠ **Changed by D-8.** An **inbound self-service B2B application** from the public front (`/ansoeg-om-bruger/`), or a KAM's own sales contact. The steps below begin at *review*, not at *create* — the applicant has already supplied company, CVR, EAN, contact and address. |
 | **Actors** | KAM (primary), Platform Admin (exception path), Customer Admin (recipient) |
 | **Preconditions** | The KAM account exists — **which today requires a server script, see §14.1**. The master catalogue is populated. |
 
@@ -580,7 +864,7 @@ INVITED ──► ACTIVE ──► DEACTIVATED
 | # | Actor | Action | System behaviour | Evidence |
 |---|---|---|---|---|
 | 1 | KAM | Opens the create-customer wizard | Wizard opens; saveable half-finished | `[C]` PROTO:`opret`; `[D]` KAM rule 6 *(draft-saving is documented, not in the prototype)* |
-| 2 | KAM | **Step 1 — Company details:** name, CVR, EAN, contact, email, phone, address, payment terms, price agreement, employee count | CVR lookup should auto-fill name and address `[D]` PRD FR-1.1, DEV §5.6 (`cvrapi.dk`) — **not in the prototype** | `[C]` / `[D]` |
+| 2 | KAM | **Step 1 — Company details.** Under D-8 this is **reviewing** what the applicant submitted, not typing it: name, CVR, EAN, contact, email, phone, address — then adding the commercial terms only PDT sets (payment terms, price agreement, employee count) | CVR lookup moves to the **public application form**, where it validates the applicant's own entry `[D]` PRD FR-1.1, DEV §5.6 (`cvrapi.dk`) | `[DEC]` D-8 |
 | 3 | KAM | **Step 2 — Range:** filter by brand and category, tick products | Selection persists; expected margin recalculates live | `[C]` PROTO:`opret`, `shopDB()` |
 | 4 | System | Continuously computes expected annual contribution | `employee count × selected products at the customer's net price` → revenue, DB, DG% against the floor | `[C]` PROTO:`shopDB`, `dbBoxHTML` |
 | 5 | KAM | **Step 3 — Activate** | **Decision point — margin gate** | |
@@ -671,7 +955,7 @@ INVITED ──► ACTIVE ──► DEACTIVATED
 | 10 | System | Computes the split server-side | `remaining ≥ total` → all on account; otherwise `remaining` on account + overage to MobilePay | `[C]` DEV §5.3, PROTO:`confirmSplit` |
 | 11 | System | Evaluates the approval rule | Over the company's limit → the order needs approval, **and the employee is told before pressing the button** | `[C]` EMP §D, PRD FR-4.2 |
 | 12 | Employee | Confirms | Order number issued; confirmation shown; receipt printable | `[C]` PROTO:`confirmSplit` |
-| 13 | System | Side effects | See §12.1 — **and note the disputed invoice timing, Q-E** | |
+| 13 | System | Side effects | See §12.1. **No invoice is raised here** — D-5 moves it to dispatch | `[DEC]` D-5 |
 
 ### Decision points
 
@@ -839,7 +1123,7 @@ INVITED ──► ACTIVE ──► DEACTIVATED
 | # | Step | Evidence |
 |---|---|---|
 | 1 | Company portion of an order becomes a receivable | `[C]` |
-| 2 | **Invoice raised — timing disputed, see Q-E** | |
+| 2 | **Invoice raised at dispatch**, when the GLS label is created | ✅ `[DEC]` D-5 |
 | 3 | Posted to e-conomic over REST | `[C]` PRD FR-5.2, HAND §5 |
 | 4 | Customer revenue updated in CRM; receivables, balance and revenue recalculate | `[C]` PROTO:`confirmSplit` → `createInvoice` → `addCrmRevenue` → `recomputeEcon` |
 | 5 | Nightly two-way reconciliation matches platform invoices against e-conomic payments; debtors marked paid or overdue | `[C]` PRD FR-5.3, PROTO:`econrec` |
@@ -892,10 +1176,10 @@ Invoicing at checkout would have meant invoicing goods that had not been picked,
 
 | # | Step | Evidence |
 |---|---|---|
-| 1 | Visitor browses the public shop at indicative prices | `[C]` PROTO:`pubshop` — **disputed, Q-A** |
+| 1 | Visitor browses the public shop at indicative prices | ✅ `[DEC]` D-1 — the public front exists |
 | 2 | Visitor puts their logo on a garment in the visualiser | `[C]` PROTO:`aistudio` for guests |
 | 3 | Visitor requests a quote | `[C]` PROTO:`pubLead` |
-| 4 | **The enquiry reaches a KAM** | `[U]` — no inbox, assignment rule or lead entity is specified anywhere |
+| 4 | **The enquiry reaches PDT** | ✅ `[C]` §0b.2 — a **live self-service B2B application** at `/ansoeg-om-bruger/` captures company, CVR, EAN, contact, address and a password the applicant chooses. Who reviews it, and where it lands, is still `[U]` → **Q-A3** |
 | 5 | KAM converts it via W-1 | `[C]` KAM |
 
 > **Open question O-9 (from `KAM`):** *"Is the quote itself part of the system, or does it stay in email until the deal is signed? This decides whether the wizard starts at 'lead' or at 'won customer'."*
@@ -982,7 +1266,7 @@ Lands on the public shop ──► categories, indicative prices
    ├─► "Put your logo on it" ──► visualiser
    └─► Request a quote ──► ??? (no specified destination — §8.10)
 ```
-`[C]` PROTO:`pubshop` — **entire journey disputed, Q-A**
+✅ `[DEC]` D-1 — the journey is real. The quote request still has no specified destination (§8.10 step 4).
 
 ---
 
@@ -1004,7 +1288,7 @@ The handoffs are where this product either works or generates phone calls. Each 
 | H-10 | System | Unmet demand | Platform Admin | Stock shortfall | `[U]` |
 | H-11 | Platform Admin | A purchase order | Supplier | Release | Channel-dependent `[C]` |
 | H-12 | Supplier | Goods + confirmation | Warehouse | Delivery | `[U]` |
-| H-13 | System | An invoice | e-conomic | Disputed (Q-E) | `[C]` |
+| H-13 | System | An invoice | e-conomic | **At dispatch** ✅ `[DEC]` D-5 | `[C]` |
 | H-14 | Employee | A return | **Nobody** | Return created | **⚠ unowned, §8.9** |
 | H-15 | Supplier | A catalogue update | Platform Admin | Feed pull | `[C]` — via the notification bell |
 
@@ -1091,7 +1375,7 @@ Budget roll-over · a leaver's unspent budget · department-level budgets · dep
 
 1. Order created with a number and date
 2. Sizes remembered per product for next time (`LASTSIZE`)
-3. **An invoice is created and posted to e-conomic** for the company portion — *disputed, Q-E*
+3. ~~An invoice is created and posted to e-conomic~~ — ❌ **removed by D-5.** The invoice is raised at dispatch, not here.
 4. Revenue added to the customer's CRM record
 5. The whole economic model recalculated, so every finance screen agrees
 6. Cart emptied
@@ -1203,7 +1487,7 @@ Per-customer range and pricing · budget/points per employee · split checkout (
 | Bulk budget actions and top-up history | CA | The most-used screen |
 | Deputy approver | CA | Orders stall in July |
 | Real notification engine | PRD | Every handoff |
-| Proof approval loop | DEV | See Q-D |
+| ~~Proof approval loop~~ | DEV | ✅ **D-4 — out of scope, not a gap** |
 | Barcode scan per item at packing | WH | Wrong-size prevention |
 | Partial dispatch and batch shipping | WH | Real warehouse cases |
 | Stock incoming windows (4/8/12/16 weeks) | DEV, SUP-CAP | Delivery promises |
@@ -1232,11 +1516,11 @@ Per-customer range and pricing · budget/points per employee · split checkout (
 
 | # | Topic | Prototype / PRD | Later docs | Priority |
 |---|---|---|---|---|
-| **C-1** | **Public shop** | Full guest shop with indicative prices, logo visualiser and quote request | `EMP`: *"No public catalogue, no guest checkout, no search engine indexing"* | **Q-A — highest** |
-| **C-2** | **Approval steps** | Flat list (1) **and** a two-step chain (2) | `PRD`: 3 levels · `CA`: 1 decision with a mandatory reason | **Q-B** |
-| **C-3** | **Order stages** | 5 stages, two different namings | 4 further variants across `PRD`, `DEV`, `WH` | **Q-C** |
-| **C-4** | **Proof gate** | Present as a screen; the production board ignores it | `DEV`: mandatory, no bypass | **Q-D** |
-| **C-5** | **Invoice timing** | At checkout | `PRD`: at dispatch, or daily batch | **Q-E** |
+| ~~C-1~~ | **Public shop** | Full guest shop with indicative prices, logo visualiser and quote request | `EMP`: *"No public catalogue, no guest checkout, no search engine indexing"* | ✅ **D-1** — both right, different surfaces |
+| ~~C-2~~ | **Approval steps** | Flat list (1) **and** a two-step chain (2) | `PRD`: 3 levels · `CA`: 1 decision with a mandatory reason | ✅ **D-2** — one step, record kept |
+| ~~C-3~~ | **Order stages** | 5 stages, two different namings | 4 further variants across `PRD`, `DEV`, `WH` | ✅ **D-3** — a seventh list, none of the six |
+| ~~C-4~~ | **Proof gate** | Present as a screen; the production board ignores it | `DEV`: mandatory, no bypass | ✅ **D-4** — no gate; out of scope |
+| ~~C-5~~ | **Invoice timing** | At checkout | `PRD`: at dispatch, or daily batch | ✅ **D-5** — at dispatch |
 | **C-6** | **"Personal purchase"** | A separate catalogue of privately-paid products | `EMP`/`DEV`: the same garments, with the **overage** paid personally | High |
 | **C-7** | **Customer lifecycle** | Kladde / Pipeline / Aktiv, driven by *first order* | `KAM`: Draft / Ready / Live / Paused, driven by a *go-live switch* | High |
 | **C-8** | **Wizard length** | 3 steps | `KAM`: 5 steps + preview + go-live | Medium |
@@ -1255,7 +1539,7 @@ Every inference made in producing this document, so each can be accepted or reje
 | # | Inference | Confidence | Basis |
 |---|---|---|---|
 | A-1 | The six prototype roles are the intended role set, despite `DEV` listing five. | Medium | Prototype + `PRD` agree on six; `DEV` omits only Guest, consistent with Guest being a Phase 4 item |
-| A-2 | *Vognmand Hansen A/S*, *Byg & Bo*, *Tarm IF* etc. are demo fixtures, not real customers. | High | `HAND` describes the prototype as demo data throughout |
+| A-2 | *Vognmand Hansen A/S*, *Byg & Bo*, *Tarm IF* etc. are demo fixtures, not real customers. | High | `HAND` describes the prototype as demo data throughout. ⚠ **Partly corrected — §0b.5:** the *customers* are fixtures, but **Frederik Kjærulff** and **Allan Berthelsen** are real employees, listed in the live site's footer |
 | A-3 | The customer admin's department-package editing is a permitted subset of the KAM's range. | Medium | Reconciles `CA`'s prohibition with the prototype's behaviour — **must be confirmed** |
 | A-4 | The KAM may see margin for their own customers only. | Medium | Required by KAM §3; bounded by PA rule 5 |
 | A-5 | The approval limit is per order. | Medium | Prototype tests a single order total |
@@ -1271,10 +1555,16 @@ Every inference made in producing this document, so each can be accepted or reje
 
 # 16. Open Questions
 
-## 16.1 Blocking — implementation cannot start without an answer
+## 16.1 Blocking — ✅ all five answered, and both follow-ups
+
+**Answered in §0 on 2026-08-27: D-1 … D-5.** The table is kept as the record of what was asked and why. The two follow-ups D-3 raised — **Q-C2** (where dispatch sits in the four stages) and **Q-C3** (which non-happy-path states survive) — were answered on 2026-08-30 and are built.
+
+### The five as originally posed
 
 | # | Question | Options | Consequence |
 |---|---|---|---|
+> These five are **answered** — D-1 … D-5 in §0. Retained as the record of what was asked, the options considered, and why each mattered.
+
 | **Q-A** | **Is there a public shop?** | (a) Full guest shop with indicative prices and quote requests (prototype + PRD) · (b) No public catalogue at all (EMP) · (c) A marketing site with no catalogue | Determines whether a sixth role exists, whether prices are ever public, SEO posture, and Phase 4 scope |
 | **Q-B** | **How many approval steps, and what is captured?** | (a) 1 decision · (b) 2-step chain (manager → purchasing) · (c) 3 levels · (d) configurable per customer | Changes the data model, the notification set, and the customer admin's main screen |
 | **Q-C** | **What is the definitive order stage list?** | Six variants exist; one must be chosen | Drives the employee tracker, the customer admin list, the warehouse board, and the invoice trigger |
@@ -1285,10 +1575,10 @@ Every inference made in producing this document, so each can be accepted or reje
 
 | # | Question |
 |---|---|
-| **Q-F** | Who receives, inspects and refunds a **return**? (W-9 has no ending) |
+| ~~Q-F~~ | ✅ **Answered — D-6.** Warehouse receives and checks; platform admin approves the refund and triggers the restock. |
 | **Q-G** | Who presses **send** on a supplier order — admin or warehouse? |
 | **Q-H** | Where does the **design manual** live, and what exactly does it hold? *(named the single biggest schema gap)* |
-| **Q-I** | Does **PDT hold stock**, or is everything bought per customer order? |
+| **Q-I** | Does **PDT hold stock**, or is everything bought per customer order? **D-3 leans towards buy-in-per-order** — it makes *"Arrived at warehouse"* a customer-visible stage, which only makes sense if the customer is waiting on goods PDT does not already hold. `[I]` — **confirm explicitly**, because it decides whether stock is a real feature. |
 | **Q-J** | Does budget **roll over** at year end, and what happens to a leaver's balance? |
 | **Q-K** | Can an admin or foreman **order on behalf of** an employee? |
 | **Q-L** | Is **MobilePay** captured at checkout or on dispatch? *(Danish practice is on dispatch)* |
@@ -1324,9 +1614,33 @@ Q1 current ERP · Q2 existing e-conomic push · Q3 supplier credential status an
 
 Work through this with the business. A **No** anywhere is more valuable than a **Yes**.
 
+## Decisions taken on 2026-08-27 — confirm they were recorded correctly
+
+**Second round (§0c):**
+- [ ] **D-7** Keep the Nordic Workwear identity. The public front will **not** look like today's site — "match the look and feel" means structure and behaviour.
+- [ ] **D-8** Keep the self-service B2B application. Onboarding starts from an inbound application, not a KAM creating a company.
+- [ ] **D-9** The platform carries its own admin dashboard.
+- [ ] **D-10** Blåkläder, Craft, Cutter & Buck, J. Harvest & Frost and Projob are in scope — four probably via NWG, **Blåkläder needs its own integration**.
+- [ ] **Q-A2 still open** — public prices. Do not decide before checking what each supplier permits (BR-39a).
+
+**First round (§0):**
+- [ ] **D-1** Public front exists, matches the current public site, and Guest is **not** a role. Five authenticated roles.
+- [ ] **D-2** One approval step, by the company admin. Reason mandatory on rejection. Record kept and logged. Chain-ready for later.
+- [ ] **D-3** Order stages are exactly: Booked → Arrived at warehouse → Sent to print/embroidery → Delivered.
+- [ ] **D-4** No mandatory proof gate.
+- [ ] **D-5** Invoice at dispatch, when the GLS label is created. None on cancellation before dispatch.
+- [ ] **D-6** Warehouse receives and checks returns; platform admin approves the refund and triggers the restock.
+- [ ] The Danish role names are right: Virksomhedsadmin · Virksomhedsmedarbejder · KAM · Lager · Platform admin.
+- [ ] The public site to match is **profildesign.dk** *(earlier documents say profildesigntrading.dk — which is it?)*
+
+## Follow-ups these decisions raised
+- [x] ~~**Q-C2** Dispatch is…~~ → **(c)**: an event that stamps the parcel number and invoice without changing status. Built as `orders.dispatched_at`.
+- [x] ~~**Q-C3**~~ → **yes**: `orders.status` also carries `pending_approval`, `cancelled` and `rejected` alongside the four visible stages (`refunded` retained pending the returns model).
+- [ ] **Q-I** PDT buys in per customer order rather than shipping from held stock — as D-3's "Arrived at warehouse" implies.
+- [ ] A refund goes back as **money / credit to the clothing account / a replacement** *(the employee form offers all three)*.
+
 ## Roles and access
-- [ ] The six roles in §3 are the right roles, with the right names.
-- [ ] **The public/guest role should exist** *(or should not — Q-A)*.
+- [ ] The five roles in §3 are the right roles, with the right names.
 - [ ] The employee should **not** have quotes, brand library, proofing, AI room and analytics *(or should — O-1)*.
 - [ ] PDT's internal staff are a fixed set of roles, **not** a configurable module matrix *(or the reverse — O-3)*.
 - [ ] The capability matrix in §4.1 is correct, row by row.
@@ -1346,8 +1660,8 @@ Work through this with the business. A **No** anywhere is more valuable than a *
 - [ ] Budgets are **annual** *(or: ______ )*.
 - [ ] The approval limit is **per order** *(or per period)*.
 - [ ] The agreed approval limit default is: ______ kr
-- [ ] The approval chain has ____ step(s), and the roles are: ______
-- [ ] A rejection **must** carry a reason.
+- [x] ~~The approval chain has ____ step(s)~~ → **D-2**: one, the company admin.
+- [x] ~~A rejection must carry a reason~~ → **D-2**: yes, mandatory.
 - [ ] The employee is notified of both approval and rejection.
 - [ ] Unused budget **does / does not** roll over at year end.
 - [ ] A leaver's unspent budget: ______
@@ -1363,8 +1677,8 @@ Work through this with the business. A **No** anywhere is more valuable than a *
 - [ ] Delivery goes to **company / department / home** *(tick all that apply)*.
 
 ## Production and dispatch
-- [ ] The order stages are exactly: ______________________ *(Q-C)*
-- [ ] A visual proof **is / is not** mandatory before production *(Q-D)*.
+- [x] ~~The order stages are exactly: ______~~ → **D-3**, four stages. Q-C2 and Q-C3 answered; migrated 2026-08-30.
+- [x] ~~A visual proof is / is not mandatory~~ → **D-4**: it is not.
 - [ ] An order with no logo skips print entirely.
 - [ ] Shipping requires a parcel number, always.
 - [ ] One step backwards is allowed; nothing comes back out of shipped.
@@ -1377,12 +1691,12 @@ Work through this with the business. A **No** anywhere is more valuable than a *
 - [ ] **______** presses send on a supplier order *(Q-G)*.
 - [ ] Minimum order quantities per supplier are: *(attach)*
 - [ ] PDT **does / does not** hold its own stock *(Q-I)*.
-- [ ] The customer is invoiced **at checkout / at dispatch / daily batch / monthly batch** *(Q-E)*.
+- [x] ~~The customer is invoiced at…~~ → **D-5**: at dispatch, on GLS label creation.
 - [ ] e-conomic is the master for customers, prices and invoices.
 
 ## Returns
-- [ ] **______** receives and inspects a returned parcel *(Q-F)*.
-- [ ] **______** approves the refund or credit.
+- [x] ~~______ receives and inspects a returned parcel~~ → **D-6**: the warehouse.
+- [x] ~~______ approves the refund or credit~~ → **D-6**: the platform admin.
 - [ ] A refund goes back as **money / credit to the clothing account / replacement**.
 
 ## Governance
@@ -1403,16 +1717,34 @@ The **tenancy and access model** is also consistent: strict per-organisation iso
 
 ## 18.2 Requires confirmation before building
 
-Five blocking questions (§16.1) and nine further high-priority ones (§16.2). Two of the five — the order stage list and the approval model — are **structural**: they change the data model, not just a screen, and every dependent surface is blocked until they are settled.
+**The five blocking questions are answered — §0, D-1 … D-5 — as is Q-F, and so are the two follow-ups D-3 raised (Q-C2, Q-C3).** Two of them were indeed structural, and both changed what is already built: **D-3 replaced the order stage list the production board and pack-and-ship ran on — migrated on 2026-08-30** — and **D-2 requires a mandatory rejection reason and a kept decision record, which is not built yet.**
+
+What now blocks implementation is narrower and newer:
+
+| # | Question | Blocks |
+|---|---|---|
+| **Q-A2** | Public front: no prices as today, or **RRP only** on a per-supplier allow-list? | The public front. **Do not answer before checking what each supplier permits** — BR-39a. §0c |
+| **Q-A3a** | Does an applicant get an auth account **before** approval, or only a lead record? | The application flow and every RLS policy. Recommendation: lead record only. §0c |
+| **Q-A3b** | Who approves an inbound application — KAM, platform admin, or either? | The review queue's home. §0c |
+| **Q-A4b** | What does `profildesignadmin.dk` actually do? | Whether our admin dashboard covers PDT's real back office. §0c |
+| **Q-A4c** | Is it decommissioned at cutover, or run alongside? | If alongside, the two must stay in sync — a much larger piece of work. §0c |
+| **Q-I** | Does PDT hold stock? | D-3 implies buy-in-per-order. Needs confirming. |
+| **Q-A2 · Q-A3 · Q-A6** | Public pricing · onboarding model · visual identity | Raised by exploring the live site — §0b. Q-A6 blocks further UI work; Q-A3 blocks W-1. |
+
+The remaining high-priority questions in §16.2 are unchanged.
 
 ## 18.3 Conflicts to resolve
 
-Nine documented conflicts (§14.5). The public shop (C-1) is the sharpest: one document describes it as a feature and another forbids it in the same words. It should be resolved first, because it determines whether a whole role exists.
+**Five of the nine are closed** (§14.5): C-1 public shop, C-2 approval steps, C-3 order stages, C-4 proof gate, C-5 invoice timing.
+
+**Four remain**, all medium or high, none blocking: C-6 what "personal purchase" means · C-7 the customer lifecycle (Pipeline/Aktiv vs. Draft/Ready/Live/Paused) · C-8 wizard length · C-9 who edits the range.
 
 ## 18.4 Gaps that must be filled before the corresponding work starts
 
 | Gap | Blocks |
 |---|---|
+| **The public front itself** | Nothing is built for it. D-1 and D-8 make it a real surface: public catalogue, category navigation, login, and the B2B application form with its review queue |
+| **Application review queue + `applied` state** | D-8's onboarding flow. Blocked on Q-A3a and Q-A3b |
 | ~~Staff creation screen~~ | ✅ Closed — see §14.3 |
 | **Design manual table** | The employee's logo choice, the warehouse's pick list, and the print shop's instructions |
 | **Catalogue-update storage** | The feed approval workflow |
@@ -1425,9 +1757,11 @@ Nine documented conflicts (§14.5). The public shop (C-1) is the sharpest: one d
 
 **For the confirmed spine — yes.** The commercial model, tenancy, the ordering loop, the split payment, the margin guardrail, the production sequence and the supplier pooling are all specified precisely enough to build, with the rules that govern them.
 
-**For five areas — no, and deliberately so.** Approval, order stages, proofing, invoicing and the public shop cannot be built from this document because the evidence contradicts itself. Those sections state the options and their consequences rather than choosing, because choosing them here would be inventing requirements.
+**For the five areas that used to contradict themselves — now yes.** Approval, order stages, proofing, invoicing and the public shop are decided in §0 and can be built.
 
-**The correct next step is a working session on §16.1.** Five decisions unblock the majority of the remaining specification.
+**The order-stage migration is done (2026-08-30).** `order_status`, `lib/production.ts`, the production board, pack-and-ship, the employee tracker, the supplier demand query and both dictionaries moved together, and `orders.dispatched_at` carries the dispatch event. **The invoice trigger is the one piece that did not move**: D-5 puts it at dispatch, and the moment now exists in `dispatchOrderAction`, but with no `invoices` table and no e-conomic client it is a marked `TODO(invoice)` rather than a raised invoice.
+
+**What still follows from D-2 and D-6:** a mandatory rejection reason with an audit line, and the returns tables and two screens. Neither is built.
 
 ---
 
@@ -1451,7 +1785,7 @@ How each blocking conclusion in §16.1 was reached, so it can be checked rather 
 
 **Confidence.** Low that either reading is correct without asking.
 
-**Verification required.** **Yes — Q-A.** Determines whether a sixth role exists, whether any price is ever public, and roughly a phase of work.
+**Verification required.** ~~Yes — Q-A.~~ ✅ **Answered: D-1 — yes, and Guest is not a role** (§0). Determines whether a sixth role exists, whether any price is ever public, and roughly a phase of work.
 
 ---
 
@@ -1465,7 +1799,7 @@ How each blocking conclusion in §16.1 was reached, so it can be checked rather 
 
 **Confidence.** High that a contradiction exists. Zero that any one model is the intended one.
 
-**Verification required.** **Yes — Q-B.** The number of steps determines the schema, not the screen.
+**Verification required.** ~~Yes — Q-B.~~ ✅ **Answered: D-2 — one step, record kept, reason mandatory** (§0). The number of steps determines the schema, not the screen.
 
 ---
 
@@ -1479,7 +1813,7 @@ How each blocking conclusion in §16.1 was reached, so it can be checked rather 
 
 **Confidence.** High that no agreed list exists.
 
-**Verification required.** **Yes — Q-C.** Highest priority of the five: the employee tracker, the customer admin list, the warehouse board and the invoice trigger all depend on it.
+**Verification required.** ~~Yes — Q-C.~~ ✅ **Answered: D-3 — four stages, none of the six found** (§0). Highest priority of the five: the employee tracker, the customer admin list, the warehouse board and the invoice trigger all depend on it.
 
 ---
 
@@ -1493,7 +1827,7 @@ How each blocking conclusion in §16.1 was reached, so it can be checked rather 
 
 **Confidence.** Medium that proofing is intended; low on who performs it.
 
-**Verification required.** **Yes — Q-D.** A mandatory gate adds a blocking stage and an unauthenticated external touchpoint — material scope.
+**Verification required.** ~~Yes — Q-D.~~ ✅ **Answered: D-4 — no proof gate** (§0). A mandatory gate adds a blocking stage and an unauthenticated external touchpoint — material scope.
 
 ---
 
@@ -1507,7 +1841,7 @@ How each blocking conclusion in §16.1 was reached, so it can be checked rather 
 
 **Confidence.** High that the prototype's timing is a demo shortcut. Low on which of the two remaining options is meant.
 
-**Verification required.** **Yes — Q-E.** Determines the finance integration and what happens to an invoice when an order is cancelled or rejected.
+**Verification required.** ~~Yes — Q-E.~~ ✅ **Answered: D-5 — at dispatch** (§0). Determines the finance integration and what happens to an invoice when an order is cancelled or rejected.
 
 ---
 
@@ -1521,7 +1855,7 @@ How each blocking conclusion in §16.1 was reached, so it can be checked rather 
 
 **Confidence.** High.
 
-**Verification required.** **Yes — Q-F.**
+**Verification required.** ~~Yes — Q-F.~~ ✅ **Answered: D-6 — warehouse checks, admin refunds** (§0).
 
 ---
 
@@ -1556,7 +1890,8 @@ All ten land on the **same** surface: normalise → diff → admin approves → 
 | **PF Concept** | HTTPS feeds | **JSON** (chosen over XML) | Product 05:00 daily · **stock 02:00 and 13:00** · prices + print-price codes Sat 14:00 · print data 06:00 daily · attributes weekly | ⏳ Form completed, awaiting signature | Only supplier with **print-price codes** as a feed. Images by image server (live) + weekly FTP. **Confidentiality applies — BR-39a** |
 | **Mascot** | FTP | CSV/Excel | Batch | ⏳ Info received | Stock is **not real time** — surface as *"updated at …"* |
 | **Engel** | FTP | CSV/Excel + images | **Nightly** | ⏳ Awaiting our contact email | Fresh each morning |
-| **NWG / New Wave** | GraphQL `api.gateway.nwg.se/graphql` | JSON | Live API | ⏳ Awaiting token + `assortmentId` | Covers Cottover, Clique, Harvest, Printer, Tenson and New Wave Profile in one pipe. `productSearch(assortmentId, filters)` · `productById(productNumber){ skus{ sku, availability } }`. Public pages are client-rendered and **cannot be scraped** |
+| **NWG / New Wave** ⭐ | GraphQL `api.gateway.nwg.se/graphql` | JSON | Live API | ⏳ Awaiting token + `assortmentId` | ⭐ **Highest-value blocked item.** One credential unlocks **six brands**: Cottover, Clique, **Craft**, **Cutter & Buck**, **J. Harvest & Frost**, **Projob** — four of which PDT sells today and D-10 puts in scope. `productSearch(assortmentId, filters)` · `productById(productNumber){ skus{ sku, availability } }`. Public pages are client-rendered and **cannot be scraped** |
+| **Blåkläder** | ❌ **None — no integration conversation yet** | — | — | ❌ **Unmapped** | Sold on the live site and in scope per D-10. Independent Swedish manufacturer, not part of New Wave Group. Needs its own approach: data channel, order channel, credentials |
 | **Nimbus** | XML feed / API | XML | ⏳ Unknown | ⏳ Spec received | **Three-level structure** — parent → colour variant → size/SKU. Carries **ESG certificates** (Global Compact, Amfori, OEKO-TEX). Text in DK/DE/EN/NO/SE |
 | **ID Identity** | Download Manager | Feed / download | Batch, cadence unknown | ⏳ Awaiting access | id.dk · Holstebro · CVR 16278874. Brands Geyser, PRO Wear, Seven Seas |
 | **Snickers / Solid Gear** | PartnerPortal + **Bynder DAM** | Portal / DAM | Manual | ⏳ Info received | **No API.** Images richer via Bynder. Price lists via customer service; stock routed through Hultafors IT in Sweden |
@@ -1605,7 +1940,7 @@ So **W-6 step 5 is not one action.** It is at least three: transmit (EDI/API), e
 | **Confirmed by this source** | Rackbeat is discontinued; **stock and orders live in the platform itself**, and e-conomic is retained for finance only. This settles the system boundary `DEV Q1` was asking about |
 | **Still blocking** | Does PDT have an account and API token? `[U]` DEV Q8 — the finance phase cannot start without it |
 
-**Unchanged by this source:** the invoice-timing conflict (**Q-E**) remains. `SUP-INT` says what e-conomic is for, not when to call it.
+**Since resolved by D-5:** the invoice is raised at dispatch, on GLS label creation. `SUP-INT` said what e-conomic is for; D-5 says when to call it.
 
 ## B.5 Physical and payment — GLS and MobilePay
 
@@ -1638,7 +1973,8 @@ Both are commitments to a customer that appear in no requirement document, and b
 |---|---|
 | ✅ **Ready to wire** — access in hand | You / F&H (feed) · TEE JAYS (SFTP live) · Fristads / Kansas (FTP live) |
 | ⏳ **Blocked on us** | Engel (needs our contact email + EDI lead) · PF Concept (sign and return the form) · TEE JAYS (confirm which of the three data types) · Snickers (decide on EDI, request portal access) |
-| ⏳ **Blocked on them** | NWG (token + `assortmentId`) · ID Identity (Download Manager access) · Mascot (FTP details, test files) · Nimbus (endpoint + access) |
+| ⏳ **Blocked on them** | **NWG (token + `assortmentId`) ⭐ — unlocks six brands** · ID Identity (Download Manager access) · Mascot (FTP details, test files) · Nimbus (endpoint + access) |
+| ❌ **Not started** | **Blåkläder** — sold today, in scope per D-10, no integration conversation has begun |
 | 🔒 **Never automatable** | F&H ordering — CSV upload into their portal is the ceiling they offer today |
 
 **Four of the eight blocked items are waiting on PDT, not on a supplier.** They are contact details and a signature, not engineering.
@@ -1648,9 +1984,14 @@ Both are commitments to a customer that appear in no requirement document, and b
 | # | Question |
 |---|---|
 | **O-15** | For no-API suppliers, does *released* mean transmitted, or file-generated-awaiting-upload? |
-| **O-16** | Which of the ten feeds are in scope for the first release? Three have live access; ten is a different project from three. |
+| **O-16** | Which of the feeds are in scope for the first release? Three have live access; **eleven** is a different project from three. |
+| **O-24** | Confirm Craft, Cutter & Buck and Projob really are inside the NWG assortment when the token arrives. If any is licensed separately it returns to the unmapped list alongside Blåkläder. |
 | **O-17** | How is a silently failed feed detected, and who is told? Specified nowhere, across fourteen documents. |
 | **O-18** | Does the delivery date use TEE JAYS' incoming-stock windows, given no other supplier provides them? *(Relates to `WH`'s open question about where a date comes from.)* |
 | **O-19** | Is white-label Phase 1/2 as `SUP-INT` states, or later? It is already built in the prototype and promised to a customer. |
 | **O-20** | Who owns the PF Concept confidentiality obligation (BR-39a) in the architecture — does it constrain exports, logs, or support access? |
+| **Q-A4** | What is `profildesignadmin.dk` — replace it, integrate with it, or leave it alongside? Concrete lead on `DEV` Q1. |
+| **Q-A5** | Blåklæder, Craft, Cutter & Buck, J. Harvest & Frost and Projob are sold today but appear in no integration note. In scope? How does their data arrive? |
+| **O-22** | **Kataloger** — downloadable brand catalogues on the public front. No equivalent anywhere in this document. |
+| **O-23** | **Firmagaver banded by price point** (Gave 200 … 1040). A gift-buying pattern the platform does not model. |
 | **O-21** | **Cancelling an invitation that was never accepted.** `PA` covers deactivating a leaver and re-sending an unopened invite, but not withdrawing one — the case where the wrong address was typed. Building the Staff screen made it visible; it is not modelled. |

@@ -17,13 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, formatMoney } from "@/lib/format";
-
-/** Delivered/shipped read as settled; cancelled reads as a problem. */
-function statusVariant(status: string) {
-  if (status === "delivered" || status === "shipped") return "secondary";
-  if (status === "cancelled" || status === "refunded") return "destructive";
-  return "outline";
-}
+import { orderBadgeTone } from "@/lib/production";
 
 export function generateMetadata() {
   return pageMetadata((d) => d.cadmin.orders.title);
@@ -82,7 +76,7 @@ export default async function OrdersPage() {
                   </span>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Badge variant={statusVariant(o.status)}>
+                  <Badge variant={orderBadgeTone(o.status)}>
                     {t.statuses[o.status]}
                   </Badge>
                   <Badge variant="secondary">
@@ -130,7 +124,7 @@ export default async function OrdersPage() {
                         {formatDate(locale, o.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(o.status)}>
+                        <Badge variant={orderBadgeTone(o.status)}>
                           {t.statuses[o.status]}
                         </Badge>
                       </TableCell>

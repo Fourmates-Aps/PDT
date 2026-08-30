@@ -17,10 +17,10 @@ export function generateMetadata() {
 /**
  * Pak & send — the prototype's `packship`.
  *
- * The queue is ordered by what can be worked on now: pickable orders first,
- * then anything waiting on a supplier, then work already in progress. A picker
- * should not have to scroll past four blocked orders to find the one they can
- * actually start.
+ * The queue is ordered by what can be worked on now: goods that are here,
+ * then work in print, then what can be booked in, then anything the supplier
+ * has not shipped, and finally today's dispatches. A picker should not have to
+ * scroll past four blocked orders to find the one they can actually start.
  */
 export default async function WarehousePage() {
   const [dict, locale] = await Promise.all([getDictionary(), getLocale()]);
@@ -28,13 +28,17 @@ export default async function WarehousePage() {
 
   const queue = await listPackQueue();
 
-  const ready = queue.filter((o) => o.status === "approved" && o.readyToPick);
-  const waiting = queue.filter((o) => o.status === "approved" && !o.readyToPick);
-  const printing = queue.filter((o) => o.status === "in_production");
-  const packing = queue.filter((o) => o.status === "packing");
-  const shipped = queue.filter((o) => o.status === "shipped");
+  // Dispatched orders are still in the queue — dispatch does not move an order
+  // (Q-C2 c) — but there is nothing left to do to them, so they sort to the end.
+  const dispatched = queue.filter((o) => o.dispatchedAt !== null);
+  const open = queue.filter((o) => o.dispatchedAt === null);
 
-  const ordered = [...ready, ...packing, ...printing, ...waiting, ...shipped];
+  const arrived = open.filter((o) => o.status === "arrived_at_warehouse");
+  const printing = open.filter((o) => o.status === "sent_to_print");
+  const incoming = open.filter((o) => o.status === "booked" && o.readyToPick);
+  const waiting = open.filter((o) => o.status === "booked" && !o.readyToPick);
+
+  const ordered = [...arrived, ...printing, ...incoming, ...waiting, ...dispatched];
 
   return (
     <>
@@ -42,10 +46,10 @@ export default async function WarehousePage() {
 
       <StatGrid>
         <Stat
-          label={t.kpiNew}
-          value={formatNumber(locale, ready.length)}
-          sub={t.kpiNewSub}
-          tone={ready.length > 0 ? "success" : "default"}
+          label={t.kpiArrived}
+          value={formatNumber(locale, arrived.length)}
+          sub={t.kpiArrivedSub}
+          tone={arrived.length > 0 ? "success" : "default"}
         />
         <Stat
           label={t.kpiWaiting}
@@ -55,9 +59,9 @@ export default async function WarehousePage() {
         />
         <Stat label={t.kpiPrint} value={formatNumber(locale, printing.length)} />
         <Stat
-          label={t.kpiShipped}
-          value={formatNumber(locale, shipped.length)}
-          sub={t.kpiShippedSub}
+          label={t.kpiDispatched}
+          value={formatNumber(locale, dispatched.length)}
+          sub={t.kpiDispatchedSub}
         />
       </StatGrid>
 

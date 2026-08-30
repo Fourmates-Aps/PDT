@@ -250,7 +250,10 @@ export async function placeOrder(items: CartItem[]): Promise<PlaceOrderResult> {
           organisationId,
           memberId: member.id,
           orderNumber: number,
-          status: needsApproval ? "pending_approval" : "approved",
+          // D-3: an order that needs no decision is BOOKED — placed with the
+          // supplier. There is no "approved" stage any more; approval is a
+          // decision that lets the order reach the first stage at all.
+          status: needsApproval ? "pending_approval" : "booked",
           paymentMethod,
           accountAmountDkk: summary.onAccount.toFixed(2),
           personalAmountDkk: summary.personal.toFixed(2),

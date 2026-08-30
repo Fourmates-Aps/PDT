@@ -32,7 +32,12 @@ export const orders = pgTable(
     memberId: uuid("member_id").references(() => organisationMembers.id),
     /** Human-facing reference, e.g. PDT-2026-00042. */
     orderNumber: text("order_number").notNull(),
-    status: orderStatus("status").notNull().default("draft"),
+    /**
+     * Default is the safe one: nothing progresses until somebody decides.
+     * Checkout always sets this explicitly — `booked`, or `pending_approval`
+     * when the customer's rules require a decision.
+     */
+    status: orderStatus("status").notNull().default("pending_approval"),
     paymentMethod: paymentMethod("payment_method").notNull(),
     /** Split checkout: allowance portion billed to the company account… */
     accountAmountDkk: numeric("account_amount_dkk", { precision: 10, scale: 2 })
@@ -49,6 +54,15 @@ export const orders = pgTable(
     shippingAddress: jsonb("shipping_address"),
     glsParcelNumber: text("gls_parcel_number"),
     glsTrackUrl: text("gls_track_url"),
+    /**
+     * When the parcel left PDT — Q-C2 (c).
+     *
+     * Dispatch is an event, not a stage: D-3 allows exactly four stages and
+     * none of them is "sent". This column is what the invoice trigger (D-5)
+     * and the warehouse read instead, and it is why an order can sit in
+     * `sent_to_print` with a parcel number and still not be `delivered`.
+     */
+    dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
     economicInvoiceId: text("economic_invoice_id"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })

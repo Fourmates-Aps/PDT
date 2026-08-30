@@ -33,6 +33,9 @@ export type BoardCard = {
   needsDecoration: boolean;
   placedAt: Date;
   dueAt: Date;
+  /** Set when the parcel left — dispatch is an event, not a stage (Q-C2 c). */
+  dispatchedAt: Date | null;
+  glsParcelNumber: string | null;
 };
 
 /** Every order currently somewhere in fulfilment, newest first per column. */
@@ -44,6 +47,8 @@ export async function listBoardCards(limit = 200): Promise<BoardCard[]> {
       status: orders.status,
       totalDkk: orders.totalDkk,
       createdAt: orders.createdAt,
+      dispatchedAt: orders.dispatchedAt,
+      glsParcelNumber: orders.glsParcelNumber,
       customer: organisations.name,
       placedBy: organisationMembers.fullName,
       units: sql<number>`coalesce(sum(${orderLines.quantity}), 0)::int`,
@@ -75,6 +80,8 @@ export async function listBoardCards(limit = 200): Promise<BoardCard[]> {
     needsDecoration: r.decorated > 0,
     placedAt: r.createdAt,
     dueAt: expectedDispatch(r.createdAt),
+    dispatchedAt: r.dispatchedAt,
+    glsParcelNumber: r.glsParcelNumber,
   }));
 }
 
@@ -111,6 +118,8 @@ export type PackOrder = {
   dueAt: Date;
   glsParcelNumber: string | null;
   glsTrackUrl: string | null;
+  /** Set once the parcel has been handed to GLS; the order does not move. */
+  dispatchedAt: Date | null;
   units: number;
   needsDecoration: boolean;
   /** True only when every line can be picked today. */
@@ -125,8 +134,10 @@ export type PackOrder = {
  * the order. Stock moves between the order being placed and the picker walking
  * the aisle, and a flag written at checkout would be a week stale by then.
  *
- * `delivered` is excluded — nothing left to do — but `shipped` is kept so the
- * warehouse can see today's dispatches and their parcel numbers.
+ * `delivered` is excluded — nothing left to do. Dispatched orders are NOT
+ * excluded: under Q-C2 (c) dispatch does not move an order, so a parcel handed
+ * to GLS this morning is still in `sent_to_print` and still on this list, with
+ * its parcel number, until somebody confirms it arrived.
  */
 export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
   const heads = await db
@@ -137,11 +148,14 @@ export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
       createdAt: orders.createdAt,
       glsParcelNumber: orders.glsParcelNumber,
       glsTrackUrl: orders.glsTrackUrl,
+      dispatchedAt: orders.dispatchedAt,
       customer: organisations.name,
     })
     .from(orders)
     .innerJoin(organisations, eq(orders.organisationId, organisations.id))
-    .where(inArray(orders.status, ["approved", "in_production", "packing", "shipped"]))
+    .where(
+      inArray(orders.status, ["booked", "arrived_at_warehouse", "sent_to_print"]),
+    )
     .orderBy(desc(orders.createdAt))
     .limit(limit);
 
@@ -200,6 +214,7 @@ export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
       dueAt: expectedDispatch(h.createdAt),
       glsParcelNumber: h.glsParcelNumber,
       glsTrackUrl: h.glsTrackUrl,
+      dispatchedAt: h.dispatchedAt,
       units: orderLinesForOrder.reduce((s, l) => s + l.quantity, 0),
       needsDecoration: orderLinesForOrder.some((l) => l.logoPlacement !== null),
       readyToPick:
@@ -222,10 +237,16 @@ export async function getOrderStage(
   return row ?? null;
 }
 
-/** Counts for the board headline, measured on the same cards it renders. */
+/**
+ * Counts for the board headline, measured on the same cards it renders.
+ *
+ * "Active" means still owed work: a dispatched order is off PDT's desk even
+ * though its stage has not changed, so it is read from the timestamp rather
+ * than from the status.
+ */
 export function boardSummary(cards: BoardCard[], now = new Date()) {
   const active = cards.filter(
-    (c) => c.status !== "delivered" && c.status !== "shipped",
+    (c) => c.status !== "delivered" && c.dispatchedAt === null,
   );
   const late = active.filter((c) => c.dueAt.getTime() < now.getTime());
   const weekEnd = new Date(now);
@@ -239,7 +260,9 @@ export function boardSummary(cards: BoardCard[], now = new Date()) {
     units: active.reduce((s, c) => s + c.units, 0),
     late: late.length,
     dueThisWeek: dueThisWeek.length,
-    shipped: cards.filter((c) => c.status === "shipped").length,
+    dispatched: cards.filter(
+      (c) => c.dispatchedAt !== null && c.status !== "delivered",
+    ).length,
     delivered: cards.filter((c) => c.status === "delivered").length,
   };
 }
