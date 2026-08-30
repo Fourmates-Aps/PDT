@@ -327,3 +327,57 @@ drop policy if exists audit_log_admin_read on public.audit_log;
 create policy audit_log_admin_read on public.audit_log
   for select to authenticated
   using (public.auth_user_role() = 'admin');
+
+-- ===========================================================================
+-- b2b_applications
+--
+-- Inbound sales data. Readable by the people who act on it — platform admins
+-- and KAMs — and writable from the browser by NOBODY.
+--
+-- The public form does not insert through a client: it posts to
+-- /api/enquiries, which writes through Drizzle as the database owner and so
+-- bypasses RLS entirely. That is deliberate. Granting anon INSERT here would
+-- make the table writable by anyone who can find the Supabase anon key, with
+-- no rate limit, no validation and no honeypot in front of it.
+-- ===========================================================================
+drop policy if exists b2b_applications_staff_read on public.b2b_applications;
+create policy b2b_applications_staff_read on public.b2b_applications
+  for select to authenticated
+  using (public.auth_user_role() in ('admin', 'key_account_manager'));
+
+-- Only a platform admin may move an application through review. A KAM can see
+-- the queue but not decide it — Q-A3b (who approves) is still open, and the
+-- narrower rule is the one that is safe to widen later.
+drop policy if exists b2b_applications_admin_write on public.b2b_applications;
+create policy b2b_applications_admin_write on public.b2b_applications
+  for update to authenticated
+  using (public.auth_user_role() = 'admin')
+  with check (public.auth_user_role() = 'admin');
+
+-- ===========================================================================
+-- enquiries
+--
+-- Same shape: staff read, nobody writes from a client. No DELETE policy either
+-- — an enquiry is answered by setting handled_at, not by making it disappear.
+-- ===========================================================================
+drop policy if exists enquiries_staff_read on public.enquiries;
+create policy enquiries_staff_read on public.enquiries
+  for select to authenticated
+  using (public.auth_user_role() in ('admin', 'key_account_manager'));
+
+drop policy if exists enquiries_staff_handle on public.enquiries;
+create policy enquiries_staff_handle on public.enquiries
+  for update to authenticated
+  using (public.auth_user_role() in ('admin', 'key_account_manager'))
+  with check (public.auth_user_role() in ('admin', 'key_account_manager'));
+
+-- ===========================================================================
+-- rate_limits
+--
+-- NO POLICIES AT ALL, on purpose.
+--
+-- RLS is enabled and nothing is granted, so every authenticated client is
+-- denied SELECT, INSERT, UPDATE and DELETE. Only the owner connection touches
+-- it. A rate-limit counter a client can read tells an attacker exactly how much
+-- budget they have left; one a client can write is not a rate limit.
+-- ===========================================================================

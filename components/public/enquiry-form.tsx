@@ -59,6 +59,8 @@ export function EnquiryForm({
   const id = useId();
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<Partial<Record<EnquiryField, true>>>({});
+  /* Set when the server answered 429, so the message can say what to do. */
+  const [limited, setLimited] = useState(false);
 
   const t = forms;
   const required = REQUIRED[kind];
@@ -85,6 +87,7 @@ export function EnquiryForm({
 
     setStatus("sending");
     setErrors({});
+    setLimited(false);
 
     try {
       const response = await fetch("/api/enquiries", {
@@ -99,6 +102,7 @@ export function EnquiryForm({
         form.reset();
       } else {
         setErrors(result.errors);
+        setLimited(result.message === "rate_limited");
         setStatus("error");
       }
     } catch {
@@ -224,7 +228,9 @@ export function EnquiryForm({
           {status === "sending" ? t.sending : submitLabel}
         </button>
         {status === "error" && Object.keys(errors).length === 0 ? (
-          <p className="text-sm text-error">{t.failed}</p>
+          <p className="text-sm text-error">
+            {limited ? t.rateLimited : t.failed}
+          </p>
         ) : null}
       </div>
 

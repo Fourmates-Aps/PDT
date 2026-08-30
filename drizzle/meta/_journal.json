@@ -43,6 +43,13 @@
       "when": 1788065154553,
       "tag": "0005_order_stages",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788083462214,
+      "tag": "0006_enquiries_and_rate_limits",
+      "breakpoints": true
     }
   ]
 }

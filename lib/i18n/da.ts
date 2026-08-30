@@ -394,6 +394,8 @@ export const da = {
       sending: "Sender…",
       invalid: "Udfyld feltet korrekt.",
       failed: "Kunne ikke sendes. Prøv igen.",
+      rateLimited:
+        "Vi har modtaget flere henvendelser fra jer lige nu. Vent et øjeblik, og prøv igen.",
       leaveEmpty: "Lad dette felt stå tomt",
       newsletterOptIn: "Ja tak, jeg vil gerne modtage nyhedsbrevet.",
       thanksTitle: "Tak for din henvendelse.",

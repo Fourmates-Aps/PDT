@@ -20,7 +20,7 @@ export function NewsletterForm({
   /* Only the strings this form shows — see EnquiryForm for why. */
   forms: Pick<
     Dictionary["public"]["forms"],
-    "thanksTitle" | "sending" | "failed" | "leaveEmpty"
+    "thanksTitle" | "sending" | "failed" | "leaveEmpty" | "rateLimited"
   >;
   locale: Locale;
 }) {
@@ -28,6 +28,7 @@ export function NewsletterForm({
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">(
     "idle",
   );
+  const [limited, setLimited] = useState(false);
 
   const t = newsletter;
 
@@ -49,6 +50,7 @@ export function NewsletterForm({
         body: JSON.stringify(payload),
       });
       const result = (await response.json()) as EnquiryResponse;
+      setLimited(!result.ok && result.message === "rate_limited");
       setStatus(result.ok ? "done" : "error");
       if (result.ok) form.reset();
     } catch {
@@ -93,7 +95,9 @@ export function NewsletterForm({
       </div>
 
       {status === "error" ? (
-        <p className="mt-2 text-xs text-error">{forms.failed}</p>
+        <p className="mt-2 text-xs text-error">
+          {limited ? forms.rateLimited : forms.failed}
+        </p>
       ) : null}
     </form>
   );

@@ -39,6 +39,7 @@ export function CallbackStrip({
     "idle",
   );
   const [errors, setErrors] = useState<Partial<Record<EnquiryField, true>>>({});
+  const [limited, setLimited] = useState(false);
 
   const t = dict.public.help;
   const labels = dict.public.forms.labels;
@@ -63,6 +64,7 @@ export function CallbackStrip({
 
     setStatus("sending");
     setErrors({});
+    setLimited(false);
 
     try {
       const response = await fetch("/api/enquiries", {
@@ -76,6 +78,7 @@ export function CallbackStrip({
         form.reset();
       } else {
         setErrors(result.errors);
+        setLimited(result.message === "rate_limited");
         setStatus("error");
       }
     } catch {
@@ -168,7 +171,9 @@ export function CallbackStrip({
                   <p className="text-sm text-highvis-400">
                     {Object.keys(errors).length > 0
                       ? t.required
-                      : dict.public.forms.failed}
+                      : limited
+                        ? dict.public.forms.rateLimited
+                        : dict.public.forms.failed}
                   </p>
                 ) : null}
               </div>

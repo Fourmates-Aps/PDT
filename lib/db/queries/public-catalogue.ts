@@ -1,4 +1,5 @@
 import "server-only";
+import { cacheKey, cached, invalidateTag } from "@/lib/cache";
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { productVariants, products } from "@/lib/db/schema";
@@ -25,6 +26,29 @@ import { productVariants, products } from "@/lib/db/schema";
  * Stock is left out for the same reason — BR-39a covers stock as well, and a
  * public stock figure is a promise we cannot keep from a batch feed.
  */
+
+/**
+ * Catalogue reads are cached in Upstash Redis.
+ *
+ * The layout asks for every category on EVERY public page render, so without a
+ * cache the front page, each product page and each catalogue page all pay for
+ * the same query on every hit. The data behind it changes when a supplier feed
+ * imports — overnight batches — not per request.
+ *
+ * Redis rather than Next's `unstable_cache`, which this replaces: that cache is
+ * per instance and starts cold after every deploy, so N instances each pay for
+ * the same query N times. Redis is one copy they all share. See lib/cache.ts.
+ *
+ * An hour is a ceiling, not the expected staleness: a feed import should call
+ * revalidatePublicCatalogue() and publish immediately.
+ */
+export const CATALOGUE_TAG = "catalogue";
+const CATALOGUE = { tag: CATALOGUE_TAG, ttl: 3600 } as const;
+
+/** Retire every cached catalogue read. Call after a feed import publishes. */
+export async function revalidatePublicCatalogue(): Promise<void> {
+  await invalidateTag(CATALOGUE_TAG);
+}
 
 export type PublicProduct = {
   id: string;
@@ -84,7 +108,7 @@ const PUBLIC_COLUMNS = {
  * Arbejdstøj, and guessing would file products under a heading nobody chose.
  * The feed pipeline (Backlog.md P1) is where that mapping belongs.
  */
-export async function listPublicCategories(
+async function listPublicCategoriesUncached(
   limit = 12,
 ): Promise<PublicCategory[]> {
   const rows = await db
@@ -104,7 +128,7 @@ export async function listPublicCategories(
 }
 
 /** Newest products, for the front page grid. */
-export async function listPublicProducts(options?: {
+async function listPublicProductsUncached(options?: {
   category?: string;
   /** Several categories at once — how a nav group is filtered. */
   categories?: string[];
@@ -196,7 +220,7 @@ export type PublicProductDetail = PublicProduct & {
 };
 
 /** One product, everything a visitor may see — and nothing else. */
-export async function getPublicProduct(
+async function getPublicProductUncached(
   slug: string,
 ): Promise<PublicProductDetail | null> {
   const [product] = await db
@@ -263,7 +287,7 @@ export type PublicBrand = { name: string; products: number };
  * image files across. So this reads the brands out of the catalogue instead:
  * true, current, and it links somewhere useful.
  */
-export async function listPublicBrands(): Promise<PublicBrand[]> {
+async function listPublicBrandsUncached(): Promise<PublicBrand[]> {
   return db
     .select({ name: products.brand, products: count(products.id) })
     .from(products)
@@ -280,4 +304,59 @@ export async function listPublicProductSlugs(limit = 1000): Promise<string[]> {
     .where(and(eq(products.isActive, true), isNotNull(products.slug), NOT_A_FIXTURE))
     .limit(limit);
   return rows.map((r) => r.slug);
+}
+
+/* ------------------------------------------------------------------ */
+/* Cached entry points — the names every page imports                  */
+/* ------------------------------------------------------------------ */
+
+export function listPublicCategories(limit = 12): Promise<PublicCategory[]> {
+  return cached(
+    cacheKey("categories", limit),
+    () => listPublicCategoriesUncached(limit),
+    CATALOGUE,
+  );
+}
+
+export function listPublicBrands(): Promise<PublicBrand[]> {
+  return cached(cacheKey("brands", null), listPublicBrandsUncached, CATALOGUE);
+}
+
+export function getPublicProduct(
+  slug: string,
+): Promise<PublicProductDetail | null> {
+  return cached(
+    cacheKey("product", slug),
+    () => getPublicProductUncached(slug),
+    CATALOGUE,
+  );
+}
+
+export function listPublicProducts(
+  options?: Parameters<typeof listPublicProductsUncached>[0],
+): Promise<PublicProduct[]> {
+  /*
+   * Free-text searches are NOT cached.
+   *
+   * The key includes the arguments, so caching these mints an entry for every
+   * string anyone ever types — an unbounded keyspace that a crawler fills for
+   * free, in a Redis shared with the rate limiter. Category and group listings
+   * are a closed set and cache cleanly; `?q=` is not.
+   */
+  if (options?.query?.trim()) return listPublicProductsUncached(options);
+
+  /*
+   * The key is built from named fields rather than the options object, because
+   * JSON.stringify follows property order: { category, limit } and
+   * { limit, category } describe the same query and must not become two entries.
+   */
+  return cached(
+    cacheKey("products", {
+      category: options?.category ?? null,
+      categories: options?.categories ? [...options.categories].sort() : null,
+      limit: options?.limit ?? null,
+    }),
+    () => listPublicProductsUncached(options),
+    CATALOGUE,
+  );
 }

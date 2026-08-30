@@ -376,6 +376,8 @@ export const en: Dictionary = {
       sending: "Sending…",
       invalid: "Please fill this in correctly.",
       failed: "Could not be sent. Try again.",
+      rateLimited:
+        "We have had several submissions from you just now. Wait a moment and try again.",
       leaveEmpty: "Leave this field empty",
       newsletterOptIn: "Yes please, I would like the newsletter.",
       thanksTitle: "Thank you for getting in touch.",
