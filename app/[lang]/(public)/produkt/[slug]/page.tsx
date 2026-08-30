@@ -180,7 +180,7 @@ export default async function PublicProductPage({
                   {dict.public.utility.login}
                 </Link>
                 <Link
-                  href={`/${locale}#contact`}
+                  href={`/${locale}/ansoeg`}
                   className="rounded-md border border-bone-300 px-5 py-2.5 text-sm font-semibold text-ink-800 transition-colors hover:border-ink-900"
                 >
                   {dict.public.utility.apply}

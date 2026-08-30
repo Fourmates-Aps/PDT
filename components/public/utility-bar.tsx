@@ -45,17 +45,15 @@ export function UtilityBar({
 
         <div className="flex shrink-0 items-center gap-4 text-[11px] font-semibold">
           {/*
-            * Points at the callback form, not at a self-service application.
+            * The live site's /ansoeg-om-bruger/, rebuilt at /ansoeg.
             *
-            * The live site's /ansoeg-om-bruger/ captures company, CVR, EAN and a
-            * password the applicant chooses, and D-8 keeps that flow — but it is
-            * blocked on Q-A3a (does an applicant get an auth account before
-            * approval?) and Q-A3b (who approves). Building the form before those
-            * are answered would decide both by accident. The lead route exists
-            * and works, so it takes the traffic until then.
+            * It captures the same fields in the same order, minus the password
+            * pair: Q-A3a — whether an applicant gets an auth account before a
+            * human approves them — is still open, and a credential collected
+            * before that is decided has nowhere to go. The form says so.
             */}
           <Link
-            href={`/${locale}#contact`}
+            href={`/${locale}/ansoeg`}
             className="text-highvis-400 transition-colors hover:text-highvis-300"
           >
             {t.apply}
