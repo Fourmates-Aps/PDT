@@ -6,6 +6,17 @@ import { Container } from "@/components/landing/section";
 import { BrandLogo } from "./brand-logo";
 import { categoryHref } from "@/lib/public-routes";
 
+/** The live site's Info menu, in its order. */
+const INFO_LINKS: { href: string; label: (d: Dictionary) => string }[] = [
+  { href: "/om-os", label: (d) => d.public.about.title },
+  { href: "/kontakt", label: (d) => d.public.contact.title },
+  { href: "/handelsbetingelser", label: () => "Handelsbetingelser" },
+  { href: "/webshop", label: (d) => d.public.webshop.title },
+  { href: "/kataloger", label: (d) => d.public.catalogues.title },
+  { href: "/brands", label: (d) => d.public.brands.title },
+  { href: "/stoerrelsesguide", label: (d) => d.public.sizeGuide.title },
+];
+
 /**
  * The storefront header.
  *
@@ -79,9 +90,32 @@ export function StoreHeader({
         </form>
 
         <nav className="ml-auto flex shrink-0 items-center gap-5">
+          {/*
+            * The live site's "Info" menu. A <details> element rather than a
+            * scripted dropdown, so it opens with the keyboard, closes with Esc
+            * and works with JavaScript off — the whole point of this surface.
+            */}
+          <details className="group relative hidden sm:block">
+            <summary className="cursor-pointer list-none text-sm text-ink-500 transition-colors hover:text-ink-900 [&::-webkit-details-marker]:hidden">
+              {t.info}
+            </summary>
+            <ul className="absolute right-0 z-50 mt-2 w-56 rounded-md border border-bone-200 bg-bone-50 py-2 shadow-lg">
+              {INFO_LINKS.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={`${base}${item.href}`}
+                    className="block px-4 py-2 text-sm text-ink-700 transition-colors hover:bg-bone-100 hover:text-ink-900"
+                  >
+                    {item.label(dict)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </details>
+
           <Link
             href={`${base}/om-os`}
-            className="hidden text-sm text-ink-500 transition-colors hover:text-ink-900 sm:block"
+            className="hidden text-sm text-ink-500 transition-colors hover:text-ink-900 lg:block"
           >
             {t.about}
           </Link>

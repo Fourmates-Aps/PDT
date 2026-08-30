@@ -34,14 +34,6 @@ export const en: Dictionary = {
     figureLabel: "Left chest · embroidery · 80 × 35 mm · PMS 186 C",
     figureCaption: "A logo specification travels with every single order.",
   },
-  trust: {
-    items: [
-      { label: "Company reg.", value: "35657886" },
-      { label: "Showrooms", value: "Vejle · Billund · Fredericia · Skjern" },
-      { label: "Delivery", value: "2–4 working days" },
-      { label: "Prices", value: "Excl. VAT" },
-    ],
-  },
   problem: {
     eyebrow: "The problem",
     title: "Corporate clothing turns into admin work fast.",
@@ -214,6 +206,7 @@ export const en: Dictionary = {
       home: "Home",
       catalogue: "Range",
       about: "About us",
+      info: "Info",
       searchLabel: "Search the range",
       searchPlaceholder: "Search",
       search: "Search",
@@ -324,6 +317,131 @@ export const en: Dictionary = {
     about: {
       title: "About Profil Design Trading",
       lead: "Why the platform exists, and what it does for your clothing spend.",
+      whoTitle: "Who Profil Design Trading are",
+      who: [
+        "Profil Design Trading has been going for more than 30 years. The company was founded in 1994 by Allan Berthelsen. We work with large and small companies as well as the public sector, and with many years of experience and capable partners behind us we can supply very nearly anything in clothing and promotional goods.",
+        "Profil Design Trading makes its living helping companies be remembered. We are a professional single-source supplier that takes pride in its customers' satisfaction. We help your company from A to Z — from advising on products to the finished result in your hands. We take responsibility and make sure nothing is left to chance. That is presumably why our customers come back, year after year.",
+        "We want your handling of workwear to be as painless as possible.",
+      ],
+      offerTitle: "So we offer",
+      offer: [
+        "Online webshop ordering.",
+        "Measuring employees at their workplace, or wherever you prefer.",
+        "Orders packed per person.",
+        "Delivery to the address you choose.",
+      ],
+      totalTitle: "Single-source supplier",
+      total: [
+        "Workwear and corporate wear",
+        "Footwear, with and without safety rating",
+        "Promotional goods and business gifts",
+      ],
+      closing:
+        "Many of our customers have brought the bulk of their range and requirements to us, because we cover a lot of ground and hold the right prices in the market.",
+    },
+
+    forms: {
+      labels: {
+        company: "Company name",
+        cvr: "Company reg. no.",
+        ean: "EAN number",
+        name: "Name",
+        firstName: "First name",
+        lastName: "Last name",
+        address: "Address",
+        zipcode: "Postcode",
+        city: "Town",
+        country: "Country",
+        phone: "Phone",
+        email: "Email",
+        subject: "Subject",
+        department: "Branch",
+        message: "Message",
+      },
+      choose: "Choose…",
+      sending: "Sending…",
+      invalid: "Please fill this in correctly.",
+      failed: "Could not be sent. Try again.",
+      leaveEmpty: "Leave this field empty",
+      newsletterOptIn: "Yes please, I would like the newsletter.",
+      thanksTitle: "Thank you for getting in touch.",
+      thanksBody: "We will come back to you as soon as we can.",
+      privacy:
+        "We only use what you enter to answer your enquiry. We do not pass it on.",
+    },
+
+    contact: {
+      title: "Contact",
+      lead: "Fill in the form and your enquiry will be answered within 24 hours on working days.",
+      branchesTitle: "Branches",
+      peopleTitle: "Talk to us",
+      formTitle: "Write to us",
+      submit: "Send enquiry",
+      phoneLabel: "Phone",
+      emailLabel: "Email",
+      noEmail: "Contact by phone",
+    },
+
+    webshop: {
+      title: "Your own webshop",
+      lead: "A webshop of your own, holding your company's own selection.",
+      body: "Simplify buying workwear, corporate wear and safety footwear for your company. The platform gives you a straightforward way to choose, customise and order what your employees need. Save time and worry by trusting us to deliver quality products that meet your requirements.",
+      ctaTitle: "Get your own webshop today",
+      ctaBody:
+        "Not sure which setup you need? Talk to us first and we will work it out together.",
+    },
+
+    brands: {
+      title: "Brands",
+      lead: "A large selection of quality brands.",
+      body: "Profil Design Trading carries the well-known quality brands in workwear, corporate wear, footwear, sportswear and business gifts.",
+      inRange: "{n} items in the range",
+      empty: "The range has not been loaded yet.",
+      wallTitle: "Brands we carry",
+      wallAlt: "Brands carried by Profil Design Trading",
+      stockedTitle: "Brands in the webshop right now",
+      stockedLead:
+        "The brands below are the ones with stock in the range today. We carry the rest, but they are not in the webshop yet.",
+    },
+
+    sizeGuide: {
+      title: "Size guide",
+      lead: "Find the right size, so the workwear sits comfortably all day.",
+      points: [
+        "Use the size guide to find your match.",
+        "Measure chest, waist, hip and foot length, and compare with the table.",
+        "Caught between two sizes? Take the larger one for freedom of movement.",
+      ],
+      tableTitle: "Sizes",
+      colSize: "Size",
+      colEu: "EU",
+      colChest: "Chest (cm)",
+      colWaist: "Waist (cm)",
+      helpTitle: "Any questions?",
+      helpBody: "Contact us — we are happy to help you find exactly the right size.",
+    },
+
+    catalogues: {
+      title: "Catalogues",
+      lead: "Our suppliers' catalogues.",
+      unavailableTitle: "The catalogues are not online yet",
+      unavailableBody:
+        "The catalogue link on the current website points at a page that does not exist. Until they are uploaded again we are happy to send them directly — write or call and they will be with you straight away.",
+    },
+
+    apply: {
+      title: "Apply for a B2B login",
+      lead: "This form is for companies that want a B2B trade login.",
+      submit: "Send application",
+      passwordNote:
+        "You choose your own password once your application has been approved — it arrives in an invitation by email. We never ask for a password in this form.",
+    },
+
+    newsletter: {
+      title: "Newsletter",
+      lead: "News about the range and campaigns.",
+      submit: "Sign up",
+      placeholder: "Your email",
     },
   },
   auth: {

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, isNotNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { productVariants, products } from "@/lib/db/schema";
 
@@ -45,6 +45,16 @@ export type PublicCategory = {
   image: string | null;
 };
 
+/**
+ * Seed fixtures must never reach a public page.
+ *
+ * scripts/seed-demo.mjs inserts a product under supplier "DEMO", brand "Demo".
+ * It was showing up on the public Brands page as a brand PDT sells, next to You
+ * and Westford Mill. Excluding it here rather than in each page means a future
+ * public query cannot forget to.
+ */
+const NOT_A_FIXTURE = ne(products.supplierId, "DEMO");
+
 const PUBLIC_COLUMNS = {
   id: products.id,
   slug: products.slug,
@@ -58,11 +68,21 @@ const PUBLIC_COLUMNS = {
 /**
  * The categories that actually have products, largest first.
  *
- * Driven from the data rather than from a fixed list. The live site's five nav
- * groups (Profiltøj · Arbejdstøj · Fodtøj · Firmagaver · Reklame artikler) do
- * not appear in any feed or document we hold, and no mapping from them to
- * `products.category` is recorded anywhere — inventing one would put products in
- * groups nobody agreed to.
+ * Driven from the data rather than from a fixed list.
+ *
+ * ⚠ UPDATE 2026-08-30: the live site's navigation DOES publish a real tree —
+ * Profiltøj, Arbejdstøj, Fodtøj, Firmagaver, Reklame artikler and Shop EL
+ * Teknik, each with its own subcategories (Profiltøj → Skjorter · Jakker ·
+ * T-shirt & Polo · Bukser · Strik · Fleece · Sweatshirt · Blazer · Veste ·
+ * Sportstøj · Tilbehør, and so on). Earlier notes in this repo said no such
+ * grouping was recorded anywhere; that was wrong, and it is recorded here so
+ * nobody re-derives the same mistake.
+ *
+ * It is still not applied, because the mapping from those groups onto
+ * `products.category` ("Poloshirts", "Huer & caps", "Synlighed"…) is a data
+ * decision: several of our categories could sit under either Profiltøj or
+ * Arbejdstøj, and guessing would file products under a heading nobody chose.
+ * The feed pipeline (Backlog.md P1) is where that mapping belongs.
  */
 export async function listPublicCategories(
   limit = 12,
@@ -75,7 +95,7 @@ export async function listPublicCategories(
       image: sql<string | null>`min(${products.primaryImage})`,
     })
     .from(products)
-    .where(eq(products.isActive, true))
+    .where(and(eq(products.isActive, true), NOT_A_FIXTURE))
     .groupBy(products.category)
     .orderBy(desc(count(products.id)), asc(products.category))
     .limit(limit);
@@ -89,7 +109,7 @@ export async function listPublicProducts(options?: {
   query?: string;
   limit?: number;
 }): Promise<PublicProduct[]> {
-  const filters = [eq(products.isActive, true)];
+  const filters = [eq(products.isActive, true), NOT_A_FIXTURE];
 
   if (options?.category) {
     filters.push(eq(products.category, options.category));
@@ -178,7 +198,7 @@ export async function getPublicProduct(
       co2Available: products.co2Available,
     })
     .from(products)
-    .where(and(eq(products.slug, slug), eq(products.isActive, true)))
+    .where(and(eq(products.slug, slug), eq(products.isActive, true), NOT_A_FIXTURE))
     .limit(1);
 
   if (!product) return null;
@@ -220,12 +240,32 @@ export async function getPublicProduct(
   };
 }
 
+export type PublicBrand = { name: string; products: number };
+
+/**
+ * The brands actually represented in the range.
+ *
+ * The live site's Brands page is a wall of supplier logos. Those are third-party
+ * trademarks, and whether PDT may reproduce each one on a NEW domain is a
+ * question for PDT and each supplier — not something to assume by copying the
+ * image files across. So this reads the brands out of the catalogue instead:
+ * true, current, and it links somewhere useful.
+ */
+export async function listPublicBrands(): Promise<PublicBrand[]> {
+  return db
+    .select({ name: products.brand, products: count(products.id) })
+    .from(products)
+    .where(and(eq(products.isActive, true), NOT_A_FIXTURE))
+    .groupBy(products.brand)
+    .orderBy(desc(count(products.id)), asc(products.brand));
+}
+
 /** Slugs for generateStaticParams / the sitemap. */
 export async function listPublicProductSlugs(limit = 1000): Promise<string[]> {
   const rows = await db
     .select({ slug: products.slug })
     .from(products)
-    .where(and(eq(products.isActive, true), isNotNull(products.slug)))
+    .where(and(eq(products.isActive, true), isNotNull(products.slug), NOT_A_FIXTURE))
     .limit(limit);
   return rows.map((r) => r.slug);
 }

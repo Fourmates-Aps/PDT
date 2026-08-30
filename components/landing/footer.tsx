@@ -4,6 +4,20 @@ import type { Dictionary, Locale } from "@/lib/i18n";
 import { otherLocale } from "@/lib/i18n";
 import { Container } from "./section";
 import { BrandLogo, NewWaveBadge } from "@/components/public/brand-logo";
+import { NewsletterForm } from "@/components/public/newsletter-form";
+import { COMPANY } from "@/lib/content/company";
+import type { Dictionary as Dict } from "@/lib/i18n";
+
+/** The live site's Information column, in its order. Every route exists. */
+const INFORMATION: { href: string; label: (d: Dict) => string }[] = [
+  { href: "/om-os", label: (d) => d.public.about.title },
+  { href: "/kontakt", label: (d) => d.public.contact.title },
+  { href: "/handelsbetingelser", label: () => "Handelsbetingelser" },
+  { href: "/webshop", label: (d) => d.public.webshop.title },
+  { href: "/kataloger", label: (d) => d.public.catalogues.title },
+  { href: "/brands", label: (d) => d.public.brands.title },
+  { href: "/stoerrelsesguide", label: (d) => d.public.sizeGuide.title },
+];
 
 /** The card marks the live site shows, in the order it shows them. */
 const PAYMENT_MARKS = ["visa", "mastercard", "mobilepay"] as const;
@@ -60,34 +74,18 @@ export function Footer({
             <h2 className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-300">
               {dict.footer.informationTitle}
             </h2>
-            {/* Only routes that exist. The live site's footer links to Kataloger,
-                Brands and Handelsbetingelser as well; none of those pages are
-                built, and a footer full of 404s is worse than a short footer. */}
+            {/* The live site's Information column, link for link. */}
             <ul className="mt-3 space-y-1.5 text-sm">
-              <li>
-                <Link
-                  href={`/${locale}/katalog`}
-                  className="hover:text-highvis-400"
-                >
-                  {dict.public.header.catalogue}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`/${locale}/om-os`}
-                  className="hover:text-highvis-400"
-                >
-                  {dict.public.header.about}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`/${locale}/login`}
-                  className="hover:text-highvis-400"
-                >
-                  {dict.public.utility.login}
-                </Link>
-              </li>
+              {INFORMATION.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={`/${locale}${item.href}`}
+                    className="hover:text-highvis-400"
+                  >
+                    {item.label(dict)}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -105,6 +103,24 @@ export function Footer({
                 </a>
               </li>
               <li>
+                <a
+                  href={`mailto:${COMPANY.email}`}
+                  className="hover:text-highvis-400"
+                >
+                  {COMPANY.email}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={COMPANY.linkedIn}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-highvis-400"
+                >
+                  LinkedIn
+                </a>
+              </li>
+              <li>
                 <Link
                   href={`/${other}`}
                   hrefLang={other}
@@ -115,6 +131,12 @@ export function Footer({
                 </Link>
               </li>
             </ul>
+
+            {/* Nyhedstilmelding, which the live site keeps in its account menu. */}
+            <h2 className="mt-7 font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-300">
+              {dict.public.newsletter.title}
+            </h2>
+            <NewsletterForm dict={dict} locale={locale} />
           </div>
         </div>
 

@@ -84,19 +84,25 @@ export function PageBanner({
 }) {
   return (
     <div className="relative isolate overflow-hidden bg-ink-900">
+      {/*
+        * Anchored right, not centred. A 1400×500 photograph cropped to a banner
+        * band shows only its middle stripe, and in this picture that stripe is
+        * the dark bag — so the banner read as a plain black bar. The subject of
+        * the shot sits on the right.
+        */}
       <Image
         src={image}
         alt=""
         fill
         sizes="100vw"
         aria-hidden="true"
-        className="object-cover object-center"
+        className="object-cover object-right"
       />
       <div
-        className="absolute inset-0 bg-gradient-to-r from-ink-900/95 via-ink-900/80 to-ink-900/40"
+        className="absolute inset-0 bg-gradient-to-r from-ink-900 via-ink-900/85 to-ink-900/20"
         aria-hidden="true"
       />
-      <Container className="relative py-12 md:py-16">
+      <Container className="relative py-16 md:py-20">
         <h1 className="max-w-[24ch] text-h1 font-display font-bold text-balance text-bone-50">
           {title}
         </h1>

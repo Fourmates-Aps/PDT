@@ -34,14 +34,6 @@ export const da = {
     figureLabel: "Bryst venstre · broderi · 80 × 35 mm · PMS 186 C",
     figureCaption: "Logospecifikation følger med hver eneste ordre.",
   },
-  trust: {
-    items: [
-      { label: "CVR", value: "35657886" },
-      { label: "Showrooms", value: "Vejle · Billund · Fredericia · Skjern" },
-      { label: "Levering", value: "2–4 hverdage" },
-      { label: "Priser", value: "Ekskl. moms" },
-    ],
-  },
   problem: {
     eyebrow: "Udfordringen",
     title: "Firmatøj bliver hurtigt til administration.",
@@ -223,6 +215,7 @@ export const da = {
       home: "Forside",
       catalogue: "Sortiment",
       about: "Om os",
+      info: "Info",
       searchLabel: "Søg i sortimentet",
       searchPlaceholder: "Indtast søgning",
       search: "Søg",
@@ -341,6 +334,132 @@ export const da = {
     about: {
       title: "Om Profil Design Trading",
       lead: "Hvorfor platformen findes, og hvad den gør for jeres tøjindkøb.",
+      /* Fra profildesigntrading.dk/om-os — virksomhedens egen tekst. */
+      whoTitle: "Hvem er Profil Design Trading",
+      who: [
+        "Profil Design Trading har eksisteret i over 30 år. Virksomheden blev etableret i 1994 af Allan Berthelsen. Vi henvender os til store og små samt offentlige virksomheder. Vi har med vores mange års erfaring og dygtige samarbejdspartnere mulighed for at levere stort set alt, hvad hjertet kan begære inden for beklædning og reklameartikler.",
+        "Profil Design Trading lever af at hjælpe virksomheder med at blive husket. Vi er en professionel totalleverandør, der sætter en ære i kundernes tilfredshed. Vi hjælper din virksomhed fra A til Z — lige fra rådgivningen om produkter til du står med det færdige resultat i hænderne. Vi tager ansvar og sikrer, at intet bliver overladt til tilfældighederne. Det må også være grunden til, at vores kunder handler med os igen og igen, år efter år.",
+        "Vi ønsker, at jeres håndtering af arbejdstøj skal være så smertefri som mulig.",
+      ],
+      offerTitle: "Derfor tilbyder vi",
+      offer: [
+        "Online webshopbestilling.",
+        "Opmåling af medarbejdere på arbejdspladsen eller det sted, I ønsker.",
+        "Personpakkede ordrer.",
+        "Levering på den ønskede adresse.",
+      ],
+      totalTitle: "Totalleverandør",
+      total: [
+        "Arbejdstøj og profilbeklædning",
+        "Sikkerhedssko med og uden sikkerhed",
+        "Reklameartikler og firmagaver",
+      ],
+      closing:
+        "Mange af vores kunder har samlet størstedelen af deres sortiment og behov hos os, fordi vi dækker bredt og har de rigtige priser i markedet.",
+    },
+
+    forms: {
+      labels: {
+        company: "Firmanavn",
+        cvr: "CVR-nummer",
+        ean: "EAN-nummer",
+        name: "Navn",
+        firstName: "Fornavn",
+        lastName: "Efternavn",
+        address: "Adresse",
+        zipcode: "Postnummer",
+        city: "By",
+        country: "Land",
+        phone: "Telefon",
+        email: "E-mail",
+        subject: "Emne",
+        department: "Afdeling",
+        message: "Besked",
+      },
+      choose: "Vælg…",
+      sending: "Sender…",
+      invalid: "Udfyld feltet korrekt.",
+      failed: "Kunne ikke sendes. Prøv igen.",
+      leaveEmpty: "Lad dette felt stå tomt",
+      newsletterOptIn: "Ja tak, jeg vil gerne modtage nyhedsbrevet.",
+      thanksTitle: "Tak for din henvendelse.",
+      thanksBody: "Vi vender tilbage hurtigst muligt.",
+      privacy:
+        "Vi bruger kun oplysningerne til at besvare din henvendelse. Vi videregiver dem ikke.",
+    },
+
+    contact: {
+      title: "Kontakt",
+      lead: "Udfyld formularen, så bliver din henvendelse besvaret inden for 24 timer på hverdage.",
+      branchesTitle: "Afdelinger",
+      peopleTitle: "Kontakt os",
+      formTitle: "Skriv til os",
+      submit: "Send henvendelse",
+      phoneLabel: "Telefon",
+      emailLabel: "E-mail",
+      noEmail: "Kontakt via telefon",
+    },
+
+    webshop: {
+      title: "Individuel webshop",
+      lead: "Få jeres egen webshop med virksomhedens eget tøjudvalg.",
+      body: "Forenkl processen med at købe arbejdstøj, profiltøj og sikkerhedssko til jeres virksomhed. Platformen giver en problemfri oplevelse, hvor I nemt kan vælge, tilpasse og bestille det nødvendige arbejdstøj til jeres medarbejdere. Spar tid og bekymringer ved at stole på os til at levere kvalitetsprodukter, der opfylder jeres behov.",
+      ctaTitle: "Få jeres egen webshop i dag",
+      ctaBody:
+        "Er I ikke sikre på, hvilken løsning I skal have, så tag fat i os først — så finder vi ud af det sammen.",
+    },
+
+    brands: {
+      title: "Brands",
+      lead: "Vi har et stort udvalg af kvalitetsmærker.",
+      body: "Hos Profil Design Trading har vi de kendte kvalitetsmærker inden for arbejdstøj, profiltøj, fodtøj, sportstøj og firmagaver.",
+      inRange: "{n} varer i sortimentet",
+      empty: "Sortimentet er ikke indlæst endnu.",
+      wallTitle: "Mærker vi forhandler",
+      wallAlt: "Mærker forhandlet af Profil Design Trading",
+      stockedTitle: "Mærker i webshoppen lige nu",
+      stockedLead:
+        "Mærkerne herunder er dem, der er varer på i sortimentet i dag. Resten af mærkerne forhandler vi, men de ligger ikke i webshoppen endnu.",
+    },
+
+    sizeGuide: {
+      title: "Størrelsesguide",
+      lead: "Find den rigtige størrelse, så arbejdstøjet sidder behageligt hele dagen.",
+      points: [
+        "Brug størrelsesguiden til at finde jeres match.",
+        "Mål bryst, talje, hofte og fodlængde, og sammenlign med tabellen.",
+        "Er I i tvivl mellem to størrelser, anbefaler vi den største for optimal bevægelsesfrihed.",
+      ],
+      tableTitle: "Størrelser",
+      colSize: "Størrelse",
+      colEu: "EU",
+      colChest: "Bryst (cm)",
+      colWaist: "Talje (cm)",
+      helpTitle: "Har I spørgsmål?",
+      helpBody: "Kontakt os — vi hjælper gerne med at finde den helt rigtige størrelse.",
+    },
+
+    catalogues: {
+      title: "Kataloger",
+      lead: "Leverandørernes kataloger.",
+      unavailableTitle: "Katalogerne ligger ikke online endnu",
+      unavailableBody:
+        "Linket til katalogerne på det nuværende website peger på en side, der ikke findes. Indtil katalogerne er lagt op igen, sender vi dem gerne direkte — skriv eller ring, så kommer de med det samme.",
+    },
+
+    apply: {
+      title: "Ansøg om B2B-login",
+      lead: "Formularen er forbeholdt virksomheder, der ønsker et B2B-forhandlerlogin.",
+      submit: "Send ansøgning",
+      passwordNote:
+        "Du vælger selv din adgangskode, når din ansøgning er godkendt — den kommer i en invitation på e-mail. Vi beder aldrig om en adgangskode i denne formular.",
+    },
+
+    newsletter: {
+      title: "Nyhedsbrev",
+      lead: "Få nyheder om sortiment og kampagner.",
+      submit: "Tilmeld",
+      placeholder: "Din e-mail",
     },
   },
   auth: {
