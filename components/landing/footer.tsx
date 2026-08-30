@@ -136,7 +136,11 @@ export function Footer({
             <h2 className="mt-7 font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-300">
               {dict.public.newsletter.title}
             </h2>
-            <NewsletterForm dict={dict} locale={locale} />
+            <NewsletterForm
+              newsletter={dict.public.newsletter}
+              forms={dict.public.forms}
+              locale={locale}
+            />
           </div>
         </div>
 

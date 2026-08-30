@@ -10,6 +10,8 @@ import {
 } from "@/lib/enquiries";
 import type { Dictionary, Locale } from "@/lib/i18n";
 
+type Forms = Dictionary["public"]["forms"];
+
 type Status = "idle" | "sending" | "success" | "error";
 
 export type FormField = {
@@ -35,14 +37,21 @@ export type FormField = {
 export function EnquiryForm({
   kind,
   fields,
-  dict,
+  forms,
   locale,
   submitLabel,
   className = "",
 }: {
   kind: EnquiryKind;
   fields: FormField[];
-  dict: Dictionary;
+  /*
+   * The forms slice, NOT the whole dictionary.
+   *
+   * A client component's props are serialised into the HTML of every page that
+   * renders it. Passing `dict` shipped all of it — admin, pricing, margin and
+   * warehouse copy included — to anonymous visitors on every public page.
+   */
+  forms: Forms;
   locale: Locale;
   submitLabel: string;
   className?: string;
@@ -51,7 +60,7 @@ export function EnquiryForm({
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<Partial<Record<EnquiryField, true>>>({});
 
-  const t = dict.public.forms;
+  const t = forms;
   const required = REQUIRED[kind];
 
   const fieldId = (name: string) => `${id}-${name}`;

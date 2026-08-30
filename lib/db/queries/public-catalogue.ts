@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { productVariants, products } from "@/lib/db/schema";
 
@@ -106,6 +106,8 @@ export async function listPublicCategories(
 /** Newest products, for the front page grid. */
 export async function listPublicProducts(options?: {
   category?: string;
+  /** Several categories at once — how a nav group is filtered. */
+  categories?: string[];
   query?: string;
   limit?: number;
 }): Promise<PublicProduct[]> {
@@ -113,6 +115,16 @@ export async function listPublicProducts(options?: {
 
   if (options?.category) {
     filters.push(eq(products.category, options.category));
+  }
+
+  if (options?.categories) {
+    // An empty set means the group carries nothing, which must return nothing —
+    // not everything, which is what an omitted filter would do.
+    filters.push(
+      options.categories.length > 0
+        ? inArray(products.category, options.categories)
+        : sql`false`,
+    );
   }
 
   // Deliberately naive: a LIKE across the four fields a visitor actually types.

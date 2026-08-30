@@ -22,8 +22,9 @@ export default async function PublicLayout({
   const [dict, locale, categories] = await Promise.all([
     getDictionary(),
     getLocale(),
-    // Six is what fits the header row on a laptop before it starts scrolling.
-    listPublicCategories(6),
+    // All of them: the header groups categories under the shop's top-level
+    // navigation, so it needs the full set to know what each group can offer.
+    listPublicCategories(50),
   ]);
 
   return (

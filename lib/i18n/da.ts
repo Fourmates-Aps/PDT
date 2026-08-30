@@ -221,6 +221,17 @@ export const da = {
       search: "Søg",
       categories: "Kategorier",
       skipToContent: "Spring til indhold",
+      account: "Konto",
+      cart: "Kurv",
+      allIn: "Alt i {group}",
+      notStocked: "Ikke i webshoppen endnu",
+    },
+
+    groups: {
+      emptyTitle: "Vi forhandler gruppen — den ligger bare ikke i webshoppen endnu",
+      emptyBody:
+        "Sortimentet i webshoppen kommer fra de leverandørfeeds, der er koblet på i dag. Mangler du noget herfra, så sig til, så finder vi det.",
+      coversTitle: "Gruppen dækker",
     },
     welcome: {
       eyebrow: "Velkommen",

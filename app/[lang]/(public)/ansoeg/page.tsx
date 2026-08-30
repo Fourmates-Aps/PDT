@@ -61,7 +61,7 @@ export default async function ApplyPage() {
           <EnquiryForm
             kind="application"
             fields={FIELDS}
-            dict={dict}
+            forms={dict.public.forms}
             locale={locale}
             submitLabel={t.submit}
             className="mt-6"

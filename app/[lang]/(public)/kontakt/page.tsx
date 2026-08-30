@@ -125,7 +125,7 @@ export default async function ContactPage() {
             <EnquiryForm
               kind="contact"
               fields={FIELDS}
-              dict={dict}
+              forms={dict.public.forms}
               locale={locale}
               submitLabel={t.submit}
               className="mt-4"

@@ -12,10 +12,16 @@ import type { EnquiryResponse } from "@/lib/enquiries";
  * around one input. It posts to the same endpoint with the same honeypot.
  */
 export function NewsletterForm({
-  dict,
+  newsletter,
+  forms,
   locale,
 }: {
-  dict: Dictionary;
+  newsletter: Dictionary["public"]["newsletter"];
+  /* Only the strings this form shows — see EnquiryForm for why. */
+  forms: Pick<
+    Dictionary["public"]["forms"],
+    "thanksTitle" | "sending" | "failed" | "leaveEmpty"
+  >;
   locale: Locale;
 }) {
   const id = useId();
@@ -23,7 +29,7 @@ export function NewsletterForm({
     "idle",
   );
 
-  const t = dict.public.newsletter;
+  const t = newsletter;
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,7 +59,7 @@ export function NewsletterForm({
   if (status === "done") {
     return (
       <p className="text-sm text-highvis-400" role="status">
-        {dict.public.forms.thanksTitle}
+        {forms.thanksTitle}
       </p>
     );
   }
@@ -77,17 +83,17 @@ export function NewsletterForm({
           disabled={status === "sending"}
           className="rounded-sm bg-highvis-500 px-4 py-2 text-sm font-semibold text-ink-900 transition-colors hover:bg-highvis-400 disabled:opacity-50"
         >
-          {status === "sending" ? dict.public.forms.sending : t.submit}
+          {status === "sending" ? forms.sending : t.submit}
         </button>
       </div>
 
       <div className="absolute left-[-9999px]" aria-hidden="true">
-        <label htmlFor={`${id}-website`}>{dict.public.forms.leaveEmpty}</label>
+        <label htmlFor={`${id}-website`}>{forms.leaveEmpty}</label>
         <input id={`${id}-website`} name="website" tabIndex={-1} autoComplete="off" />
       </div>
 
       {status === "error" ? (
-        <p className="mt-2 text-xs text-error">{dict.public.forms.failed}</p>
+        <p className="mt-2 text-xs text-error">{forms.failed}</p>
       ) : null}
     </form>
   );

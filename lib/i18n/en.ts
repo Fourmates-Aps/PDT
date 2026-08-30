@@ -212,6 +212,17 @@ export const en: Dictionary = {
       search: "Search",
       categories: "Categories",
       skipToContent: "Skip to content",
+      account: "Account",
+      cart: "Basket",
+      allIn: "Everything in {group}",
+      notStocked: "Not in the webshop yet",
+    },
+
+    groups: {
+      emptyTitle: "We carry this group — it is just not in the webshop yet",
+      emptyBody:
+        "What the webshop holds comes from the supplier feeds connected today. If you need something from this group, say so and we will find it.",
+      coversTitle: "This group covers",
     },
     welcome: {
       eyebrow: "Welcome",

@@ -1,10 +1,16 @@
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, ShoppingBag, User } from "lucide-react";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { otherLocale } from "@/lib/i18n";
 import { Container } from "@/components/landing/section";
 import { BrandLogo } from "./brand-logo";
 import { categoryHref } from "@/lib/public-routes";
+import {
+  NAV_GROUPS,
+  UNGROUPED_LABEL,
+  UNGROUPED_SLUG,
+  ungroupedCategories,
+} from "@/lib/content/navigation";
 
 /** The live site's Info menu, in its order. */
 const INFO_LINKS: { href: string; label: (d: Dictionary) => string }[] = [
@@ -18,18 +24,25 @@ const INFO_LINKS: { href: string; label: (d: Dictionary) => string }[] = [
 ];
 
 /**
- * The storefront header.
+ * The storefront header, arranged as profildesigntrading.dk arranges it.
  *
- * Everything is a link or a plain GET form, so this stays a Server Component and
- * the whole public front works with JavaScript off — which matters more here than
- * anywhere else in the app, because this is the surface strangers and crawlers
- * meet first.
+ * Their layout, which this now follows: logo left, search across the middle, an
+ * icon cluster on the right with a label under each icon, and the shop's
+ * top-level groups on a second row with dropdowns.
  *
- * The category row REPLACES the live site's five fixed groups (Profiltøj ·
- * Arbejdstøj · Fodtøj · Firmagaver · Reklame artikler). No feed or document we
- * hold maps those groups onto `products.category`, so the nav is built from the
- * categories that actually have products in them. Swap it the moment the real
- * grouping is known — see listPublicCategories.
+ * Their palette is NOT followed. D-7 keeps the ink/bone/high-vis identity and
+ * defines "match the look and feel" as structure and behaviour — so this is
+ * their arrangement in our colours, deliberately.
+ *
+ * Still no JavaScript: the dropdowns are <details> elements, so they open by
+ * keyboard, close with Escape and work with scripting off. That matters more
+ * here than anywhere else in the app, because this is the surface strangers and
+ * crawlers meet first.
+ *
+ * FAVORITTER IS DELIBERATELY ABSENT. Their cluster has four icons; this has
+ * three. A wishlist is P3 in Backlog.md and does not exist, so the heart would
+ * send a visitor to the login and then to nothing. A gap in the row is better
+ * than an icon promising a feature we do not have.
  */
 export function StoreHeader({
   dict,
@@ -38,35 +51,31 @@ export function StoreHeader({
 }: {
   dict: Dictionary;
   locale: Locale;
-  /** Category names, already ordered by size. */
+  /** Every category with stock, so the menus can only offer what is real. */
   categories: string[];
 }) {
   const t = dict.public.header;
   const other = otherLocale(locale);
   const base = `/${locale}`;
 
+  const stocked = new Set(categories);
+  const leftovers = ungroupedCategories(categories);
+
   return (
-    // Sticky from md up only. On a phone the three rows come to 154px — a fifth
-    // of the viewport — and pinning that much chrome to the top costs more than
-    // the convenience of a search box that follows you down the page.
     <header className="border-b border-bone-200 bg-bone-50/95 backdrop-blur-sm md:sticky md:top-0 md:z-50">
-      {/* Wraps rather than hides: on a phone the search moves to its own line
-          under the logo instead of disappearing, because a shop whose only
-          search box is desktop-only is a shop most visitors cannot search. */}
-      <Container className="flex flex-wrap items-center gap-x-4 gap-y-2.5 py-3 sm:gap-x-6 md:h-16 md:flex-nowrap md:py-0">
+      <Container className="flex flex-wrap items-center gap-x-4 gap-y-2.5 py-3 sm:gap-x-6 md:h-[76px] md:flex-nowrap md:py-0">
         <Link href={base} className="shrink-0" aria-label="Profil Design Trading">
-          {/* "Be your brand" is inside the artwork — it is not a separate line
-              of markup any more. */}
           <BrandLogo tone="ink" className="h-9 w-auto sm:h-10" />
         </Link>
 
-        {/* A GET form: the query ends up in the URL, so a search is shareable
-            and the back button behaves. */}
+        {/* A GET form: the query ends up in the URL, so a search is shareable and
+            the back button behaves. Wraps to its own line on a phone rather than
+            disappearing. */}
         <form
           action={`${base}/katalog`}
           method="get"
           role="search"
-          className="order-last flex w-full min-w-0 items-center md:order-none md:ml-auto md:w-auto md:max-w-[420px] md:flex-1"
+          className="order-last flex w-full min-w-0 items-center md:order-none md:mx-auto md:w-auto md:max-w-[440px] md:flex-1"
         >
           <label className="sr-only" htmlFor="site-search">
             {t.searchLabel}
@@ -89,15 +98,21 @@ export function StoreHeader({
           </div>
         </form>
 
-        <nav className="ml-auto flex shrink-0 items-center gap-5">
-          {/*
-            * The live site's "Info" menu. A <details> element rather than a
-            * scripted dropdown, so it opens with the keyboard, closes with Esc
-            * and works with JavaScript off — the whole point of this surface.
-            */}
-          <details className="group relative hidden sm:block">
-            <summary className="cursor-pointer list-none text-sm text-ink-500 transition-colors hover:text-ink-900 [&::-webkit-details-marker]:hidden">
-              {t.info}
+        {/* The icon cluster: icon over label, as theirs is. */}
+        <nav className="ml-auto flex shrink-0 items-start gap-5 sm:gap-6">
+          <details className="group relative">
+            <summary className="flex cursor-pointer list-none flex-col items-center gap-1 text-ink-500 transition-colors hover:text-ink-900 [&::-webkit-details-marker]:hidden">
+              <span
+                className="flex h-5 flex-col justify-center gap-[3px]"
+                aria-hidden="true"
+              >
+                <span className="block h-[2px] w-5 bg-current" />
+                <span className="block h-[2px] w-5 bg-current" />
+                <span className="block h-[2px] w-5 bg-current" />
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em]">
+                {t.info}
+              </span>
             </summary>
             <ul className="absolute right-0 z-50 mt-2 w-56 rounded-md border border-bone-200 bg-bone-50 py-2 shadow-lg">
               {INFO_LINKS.map((item) => (
@@ -110,55 +125,132 @@ export function StoreHeader({
                   </Link>
                 </li>
               ))}
+              <li className="mt-1 border-t border-bone-200 pt-1 lg:hidden">
+                <Link
+                  href={`/${other}`}
+                  hrefLang={other}
+                  className="block px-4 py-2 text-sm text-ink-700 transition-colors hover:bg-bone-100 hover:text-ink-900"
+                >
+                  {dict.meta.switchTo}
+                </Link>
+              </li>
             </ul>
           </details>
 
           <Link
-            href={`${base}/om-os`}
-            className="hidden text-sm text-ink-500 transition-colors hover:text-ink-900 lg:block"
+            href={`${base}/login`}
+            className="flex flex-col items-center gap-1 text-ink-500 transition-colors hover:text-ink-900"
           >
-            {t.about}
+            <User className="size-5" aria-hidden="true" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em]">
+              {t.account}
+            </span>
           </Link>
+
+          {/* An anonymous visitor is sent to the login, which is what their site
+              does too — the basket lives behind the customer's agreement. */}
+          <Link
+            href={`${base}/cart`}
+            className="flex flex-col items-center gap-1 text-ink-500 transition-colors hover:text-ink-900"
+          >
+            <ShoppingBag className="size-5" aria-hidden="true" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em]">
+              {t.cart}
+            </span>
+          </Link>
+
           <Link
             href={`/${other}`}
             hrefLang={other}
             aria-label={dict.meta.switchToAria}
-            className="hidden text-sm text-ink-500 transition-colors hover:text-ink-900 lg:block"
+            className="hidden self-center text-sm text-ink-500 transition-colors hover:text-ink-900 lg:block"
           >
             {dict.meta.switchTo}
-          </Link>
-          <Link
-            href={`${base}/login`}
-            className="rounded-md bg-ink-900 px-4 py-2 text-sm font-semibold text-bone-50 transition-colors hover:bg-ink-700"
-          >
-            {dict.public.utility.login}
           </Link>
         </nav>
       </Container>
 
-      {/* Category row. Scrolls sideways on a phone rather than wrapping to three
-          lines and pushing the page down. */}
+      {/* The group row. Scrolls sideways on a phone rather than wrapping to
+          three lines and pushing the page down. */}
       <div className="border-t border-bone-200 bg-bone-50">
         <Container className="-mx-5 overflow-x-auto px-5 sm:mx-0 sm:overflow-visible sm:px-8">
-          <ul className="flex w-max items-center gap-5 py-2.5 sm:w-auto sm:flex-wrap">
+          <ul className="flex w-max items-center gap-6 py-2.5 sm:w-auto sm:flex-wrap">
+            {NAV_GROUPS.map((group) => {
+              const mine = group.ours.filter((c) => stocked.has(c));
+              return (
+                <li key={group.slug} className="relative">
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap font-display text-xs font-semibold uppercase tracking-[0.1em] text-ink-800 transition-colors hover:text-highvis-700 [&::-webkit-details-marker]:hidden">
+                      {group.label}
+                      <span
+                        className="text-[9px] text-ink-400 transition-transform group-open:rotate-180"
+                        aria-hidden="true"
+                      >
+                        ▾
+                      </span>
+                    </summary>
+
+                    <div className="absolute left-0 z-50 mt-2 w-64 rounded-md border border-bone-200 bg-bone-50 py-2 shadow-lg">
+                      <Link
+                        href={`${base}/katalog/gruppe/${group.slug}`}
+                        className="block px-4 py-2 text-sm font-semibold text-ink-900 transition-colors hover:bg-bone-100"
+                      >
+                        {t.allIn.replace("{group}", group.label)}
+                      </Link>
+
+                      {mine.length > 0 ? (
+                        <ul className="mt-1 border-t border-bone-200 pt-1">
+                          {mine.map((category) => (
+                            <li key={category}>
+                              <Link
+                                href={categoryHref(locale, category)}
+                                className="block px-4 py-2 text-sm text-ink-700 transition-colors hover:bg-bone-100 hover:text-ink-900"
+                              >
+                                {category}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        /* Nothing stocked, so their own sub-categories are shown
+                           as plain text: the menu still says what the group
+                           covers without offering links that go nowhere. */
+                        <div className="mt-1 border-t border-bone-200 px-4 pt-2 pb-1">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warning">
+                            {t.notStocked}
+                          </p>
+                          {group.children.length > 0 ? (
+                            <p className="mt-1.5 text-xs leading-relaxed text-ink-500">
+                              {group.children.join(" · ")}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                </li>
+              );
+            })}
+
+            {leftovers.length > 0 ? (
+              <li>
+                <Link
+                  href={`${base}/katalog/gruppe/${UNGROUPED_SLUG}`}
+                  className="whitespace-nowrap font-display text-xs font-semibold uppercase tracking-[0.1em] text-ink-500 transition-colors hover:text-ink-900"
+                >
+                  {UNGROUPED_LABEL}
+                </Link>
+              </li>
+            ) : null}
+
             <li>
               <Link
                 href={`${base}/katalog`}
-                className="font-display text-xs font-semibold uppercase tracking-[0.1em] text-ink-900 transition-colors hover:text-highvis-700"
+                className="whitespace-nowrap text-sm text-ink-500 transition-colors hover:text-ink-900"
               >
-                {t.catalogue}
+                {dict.public.catalogue.allCategories}
               </Link>
             </li>
-            {categories.map((category) => (
-              <li key={category}>
-                <Link
-                  href={categoryHref(locale, category)}
-                  className="whitespace-nowrap text-sm text-ink-500 transition-colors hover:text-ink-900"
-                >
-                  {category}
-                </Link>
-              </li>
-            ))}
           </ul>
         </Container>
       </div>
