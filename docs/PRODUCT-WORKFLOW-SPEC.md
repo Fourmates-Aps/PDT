@@ -13,6 +13,7 @@ Every material statement carries an evidence tag. **Nothing in this document is 
 
 | Tag | Meaning |
 |---|---|
+| **[DEC] Decided** | **Answered by the business.** Outranks every other source, including the PRD and the prototype. Recorded in §0 with its consequences. |
 | **[C] Confirmed** | Demonstrated by prototype behaviour **and** supported by documentation. |
 | **[D] Documented** | Stated in a written requirement, but not present in the prototype. |
 | **[P] Prototype** | The prototype does this, but no document describes it. |
@@ -34,6 +35,135 @@ Every material statement carries an evidence tag. **Nothing in this document is 
 | `PROTO:<view>` | A named view in `prototype/ProfilDesignTrading_Platform.html` (e.g. `PROTO:medshop`) |
 
 > **A note on the two documentation generations.** `PRD` and `DEV` describe the product as originally specified. The five `docs/*.md` role specs are a **later rewrite** that in several places deliberately narrows or contradicts the earlier documents. Where they disagree, this specification records both and asks stakeholders to choose. It does not assume the newer document wins.
+
+
+---
+
+# 0. Stakeholder Decisions
+
+**Recorded 2026-08-27.** Six questions answered by the business. These are **[DEC]** — they outrank the PRD, the role specs and the prototype, and they close five of the six blocking questions in §16.1.
+
+Where a decision contradicts something already built, that is stated here rather than left for someone to discover.
+
+## D-1 · There is a public shop *(answers Q-A, closes conflict C-1)*
+
+There **is** a public, unauthenticated front to the site, matching the look and feel of the current **profildesign.dk**. From there people sign in.
+
+**Guest is not a role.** It is simply the unauthenticated front of the site. The platform has **five** authenticated roles:
+
+| Danish | This document | `lib/auth/roles.ts` |
+|---|---|---|
+| Virksomhedsadmin | Company admin | `customer_admin` |
+| Virksomhedsmedarbejder | Company employee | `employee` |
+| KAM | Key Account Manager | `key_account_manager` |
+| Lager | Warehouse | `warehouse` |
+| — | Platform admin | `admin` |
+
+**Consequences**
+- §3.1's "Guest" is **not** a sixth role. Every "six roles" statement in this document should be read as *five roles plus an unauthenticated front*. `DEV §4.1`'s five-role definition was right.
+- `EMPLOYEE-SHOP.md`'s prohibitions (*"no public catalogue, no guest checkout, no search engine indexing"*) apply to the **employee shop**, not to the site. The public front may show indicative prices; the employee shop stays private.
+- The public front is a **new build surface**. Nothing in the current implementation serves it.
+- Open: the existing site is cited here as `profildesign.dk`; earlier documents say `profildesigntrading.dk`. Confirm which domain the look and feel is taken from.
+
+## D-2 · Approval is one step *(answers Q-B, closes conflict C-2)*
+
+An order over the employee's budget or limit goes to **a single approval by the company admin**.
+
+**Every decision is kept and logged** — who, what, when, why. **A rejection carries a mandatory reason.** The prototype's delete-on-decision behaviour is **wrong** and must not be reproduced.
+
+The data model must allow a two- or three-level chain (manager → purchasing) to be added later for larger customers. **Ship one step.**
+
+**Consequences**
+- Selects `CUSTOMER-ADMIN.md`'s model over `PRD FR-4.2`'s three levels and the prototype's two-step `godkendflow`.
+- `approval_requests` already keeps the record (`status`, `approver_id`, `decided_at`, `notes`) — the shape is right. Two changes needed: **a reason must be required on rejection**, and each decision must write an `audit_log` line.
+- "Chain-ready later" means the schema should not assume one row per order forever. Adding `step_index` and `step_role` to `approval_requests` now costs nothing and avoids a migration on live approval history later. **Recommended, not yet agreed.**
+
+## D-3 · Order stages — exactly four *(answers Q-C, closes conflict C-3)*
+
+The single authoritative list for `orders.status`, used everywhere — employee tracker, company admin list, warehouse board, invoice trigger:
+
+| # | Danish | English |
+|---|---|---|
+| 1 | Booking | **Booked** |
+| 2 | Ankommet på lager | **Arrived at warehouse** |
+| 3 | Sendt til tryk/broderi | **Sent to print/embroidery** |
+| 4 | Leveret | **Delivered** |
+
+**This is a different shape from anything previously documented**, and materially different from what is built. Note stage 2: goods **arriving from the supplier** is now a customer-visible stage. That implies PDT buys in per order rather than shipping from held stock — see the note under §16.2 Q-I.
+
+**Consequences — this contradicts working code**
+
+| Built today | Under D-3 |
+|---|---|
+| `order_status` enum: `draft · pending_approval · approved · in_production · packing · shipped · delivered · cancelled · refunded` | Four stages, none of which is `packing` or `shipped` |
+| `lib/production.ts` `STAGES` = `approved → in_production → packing → shipped → delivered` | A different list, in a different order |
+| Production board columns, Pack & ship queue, employee order tracker | All read the old list |
+
+- The old order also differs: it decorated, then packed, then shipped. D-3 receives goods **first**, then decorates. That is coherent for a buy-in-per-order model and the old model simply lacked the receiving step.
+- **⚠ One thing D-3 does not resolve — see Q-C2 below.** The four stages contain no dispatch state, yet D-5 hangs the invoice on the GLS label. That has to be settled before this can be implemented.
+
+## D-4 · No mandatory proof gate *(answers Q-D, closes conflict C-4)*
+
+Visual proofing is **not** required. There is **no blocking proof gate** before production.
+
+**Consequences**
+- `DEV §7.1`'s *"mandatory before any production starts. No bypass."* is **superseded**.
+- The prototype's `korrektur` screen and its six proof states are **out of scope**.
+- Removes the customer-facing signed-URL approval loop from the build entirely.
+- O-1 shrinks: proofing is no longer a reason for the employee role to carry production tools.
+
+## D-5 · The invoice is raised at dispatch *(answers Q-E, closes conflict C-5)*
+
+The invoice is raised **when the GLS label / barcode is created** in pack-and-ship. **Not** at checkout. **Not** in a daily batch.
+
+**On cancellation or rejection before dispatch, no invoice is raised.**
+
+**Consequences**
+- The prototype's invoice-at-checkout (`PROTO:confirmSplit` → `createInvoice(..., 'Bogført')`) is **wrong** and must not be carried over.
+- `PROTO:samlefaktura` (daily batch consolidation) is **not** the invoicing model. Whether it survives as an optional consolidation for large customers is undecided — currently out of scope.
+- Confirms `PRD FR-5.2`'s "upon order dispatch".
+- The trigger lives in the same action that writes the parcel number — today `shipOrderAction` in `app/[lang]/dashboard/fulfilment-actions.ts`.
+- **Depends on Q-C2:** "dispatch" must correspond to an identifiable moment in the four-stage list.
+
+## D-6 · Returns have an owner *(answers Q-F, closes the §13.4 dead end)*
+
+| Step | Owner |
+|---|---|
+| Request a return, receive a prepaid GLS label | Company employee |
+| **Receive and check the returned parcel** | **Warehouse** |
+| **Approve the refund / credit note, trigger the restock** | **Platform admin (PDT)** |
+
+**The warehouse cannot refund on its own.**
+
+**Consequences**
+- Closes the gap where a return could be started but not finished (§8.9 steps 4–6, §13.4).
+- Consistent with `WAREHOUSE.md`'s *"They cannot cancel or refund an order — that is an admin decision."*
+- Needs a `returns` table and two new screens — a warehouse receiving step and an admin refund decision. Neither exists.
+- Undecided: whether a refund goes back as money, as credit to the clothing account, or as a replacement. The employee-facing form already offers all three (`PROTO:retur`); which are honoured is not stated.
+
+---
+
+## Follow-up raised by these decisions
+
+### ⚠ Q-C2 · Where does dispatch sit in the four stages? — **blocking**
+
+D-3 gives four stages with no dispatch/shipped state. D-5 raises the invoice at GLS label creation. `WAREHOUSE.md` requires that *"shipping requires a parcel number"* and that *"nothing moves back out of shipped."* Those cannot all hold unless dispatch is locatable.
+
+| Reading | Meaning | Consequence |
+|---|---|---|
+| **(a)** `Delivered` is entered when the label is created | "Delivered" means *dispatched by PDT*, not *received by the customer* | Simplest. But the customer sees "Leveret" while the parcel is still on the van |
+| **(b)** A fifth stage sits between 3 and 4 | e.g. *Sendt* / dispatched | Contradicts "exactly four" |
+| **(c)** Dispatch is an event, not a stage | The parcel number and invoice are stamped without changing status; `Delivered` is set on GLS confirmation | Keeps four customer-visible stages and an accurate one. Needs a dispatch timestamp column |
+
+**Recommendation: (c).** It preserves the four stages exactly as decided, keeps "Leveret" honest for the customer, and gives the invoice a precise trigger. It costs one timestamp column.
+
+### Q-C3 · Which non-happy-path states survive?
+
+`orders.status` cannot be only four values in practice. At minimum:
+- **`pending_approval`** — D-2 requires an order to wait for a decision
+- **`cancelled`** / **`rejected`** — D-5 explicitly refers to *"cancellation/rejection before dispatch"*
+
+Proposal: the four stages are the **customer-visible happy path**; the enum also carries `pending_approval`, `cancelled` and `rejected`, which the tracker renders as an interruption rather than a step. **Needs confirmation.**
 
 ---
 
@@ -82,15 +212,15 @@ Public enquiry ──► KAM creates customer, range, prices, logo ──► inv
 
 ## 1.5 What stakeholders most need to decide
 
-Five questions block implementation. Each is expanded in §16.
+**All five have since been answered — see §0.** They are kept here because the reasoning behind each still matters, and because two of them changed what is already built.
 
 | # | Question | Why it blocks |
 |---|---|---|
-| **Q-A** | **Is there a public shop, or not?** | `PRD` and the prototype have one; `EMP` forbids it outright. This changes the auth model, SEO, and whether a sixth role exists at all. |
-| **Q-B** | **How many approval steps — one, two or three?** | Three different models exist across the evidence. Determines the data model, not just a screen. |
-| **Q-C** | **What are the order stages, exactly?** | Four different stage lists exist. Every downstream screen and the customer's status tracker depend on one answer. |
-| **Q-D** | **Is a visual proof mandatory before production?** | `DEV` says mandatory, no bypass. No other source mentions the gate. Adds a blocking stage and a customer-facing loop. |
-| **Q-E** | **When is the invoice raised — at checkout, at dispatch, or in a daily batch?** | The prototype does all three in different places. Determines the finance integration. |
+| ~~**Q-A**~~ | **Is there a public shop?** | ✅ **Answered — D-1.** Yes. Guest is not a role; it is the unauthenticated front. Five authenticated roles. |
+| ~~**Q-B**~~ | **How many approval steps?** | ✅ **Answered — D-2.** One, by the company admin. Decision kept and logged; reason mandatory on rejection. |
+| ~~**Q-C**~~ | **What are the order stages?** | ✅ **Answered — D-3.** Booked → Arrived at warehouse → Sent to print/embroidery → Delivered. **⚠ Raises Q-C2 and Q-C3.** |
+| ~~**Q-D**~~ | **Is a visual proof mandatory?** | ✅ **Answered — D-4.** No. No blocking proof gate. |
+| ~~**Q-E**~~ | **When is the invoice raised?** | ✅ **Answered — D-5.** At dispatch, when the GLS label is created. None raised on cancellation before dispatch. |
 
 ---
 
@@ -125,7 +255,7 @@ A Next.js implementation exists in this repository and is materially further alo
 
 # 3. User Roles
 
-Six roles are evidenced. The prototype's role selector defines exactly six; `PRD §3` lists the same six; `DEV §4.1` defines only five.
+**Superseded by D-1: there are FIVE roles plus an unauthenticated public front.** The six-role reading below came from the prototype's role selector and `PRD §3`; `DEV §4.1`'s five were right. §3.1 is retained because the public front is a real surface — it is simply not a role.
 
 ## 3.1 Guest (public, unauthenticated)
 
@@ -135,9 +265,9 @@ Six roles are evidenced. The prototype's role selector defines exactly six; `PRD
 | **Purpose** | Let a prospective customer see the range and indicative prices, put their logo on a garment, and ask for a quote. |
 | **Can do** | Browse a public product grid; use the size guide; use the logo visualiser; request a quote. `[C]` PROTO:`pubshop`, `NAV.gaest` |
 | **Cannot do** | See any customer's agreed prices; order anything; see cart or favourites (removed for guests in the audit). `[C]` REV §2 |
-| **Status** | **DISPUTED.** `EMP` states: *"There is no browsing without logging in. No public catalogue, no guest checkout."* `DEV §4.1` omits the role entirely. `PRD` Phase 4 schedules "Finalize B2C Guest webshop and RFQ flow". |
+| **Status** | ✅ **RESOLVED — D-1.** The public front **exists** and matches the look and feel of the current public site. It is **not a role**: it is the unauthenticated front from which people sign in. `EMP`'s prohibitions govern the employee shop, not the site. |
 
-> **⚠ Conflict Q-A.** The role exists in the prototype and the PRD, and is explicitly forbidden by the employee-shop specification. **Stakeholder decision required.**
+> ✅ **Settled by D-1.** Both readings were partly right: a public front exists (prototype, PRD) *and* the employee shop is private (EMP). They describe different surfaces.
 
 ## 3.2 Employee
 
@@ -366,6 +496,8 @@ A third value, **Kladde** (draft), appears in the customer list but nothing in t
 
 ## 7.2 Order — four competing stage models
 
+> ✅ **SUPERSEDED BY D-3.** The authoritative list is **Booked → Arrived at warehouse → Sent to print/embroidery → Delivered**. The table below is kept as the record of what was found — it shows how far apart the sources were, and that **none of the six matches the decision**, which is why this had to be asked rather than inferred.
+
 | Source | Stages |
 |---|---|
 | `PRD` FR-4.4 | Draft → Pending Approval → **Proofing** → Print/Embroidery Queue → Packing → Shipped |
@@ -377,7 +509,7 @@ A third value, **Kladde** (draft), appears in the customer list but nothing in t
 
 Six renderings, no two identical. They disagree on: whether **Proofing** is a stage; whether **Delivered** exists; whether **Ready/Klar** is a stage or a substate of packing; and whether packing precedes or follows print.
 
-> **⚠ Conflict Q-C — highest-priority resolution.** The order status drives the employee's tracker, the customer admin's list, the warehouse board and the invoice trigger. Every one of those screens is blocked on a single agreed list.
+> ✅ **Resolved by D-3** — and the answer was none of the six. Two follow-ups remain before it can be built: **Q-C2** (where dispatch sits) and **Q-C3** (which non-happy-path states survive). Both in §0.
 
 **What is consistent across all sources** `[C]`:
 - Print/embroidery, packing and shipping happen in that order.
@@ -393,7 +525,7 @@ Six renderings, no two identical. They disagree on: whether **Proofing** is a st
 
 **Neither `WH` nor the prototype's own production board references a proof gate at all.** The warehouse board moves orders from approved straight into print. `[C]` PROTO:`produktion`
 
-> **⚠ Conflict Q-D.** If proofing is mandatory, it is a **blocking stage with an external, unauthenticated customer touchpoint** — a significant piece of work absent from the warehouse specification and from the order lifecycle used everywhere else.
+> ✅ **Resolved by D-4: proofing is not mandatory and there is no proof gate.** `DEV §7.1` is superseded and the prototype's `korrektur` workflow is out of scope. The warehouse specification's silence on proofs turns out to have been correct.
 
 ## 7.4 Approval Request
 
@@ -405,7 +537,7 @@ Six renderings, no two identical. They disagree on: whether **Proofing** is a st
 
 **Model D — single decision with mandatory reason** `[D]` CA §E: *"Approve or **Reject with a reason** — a rejection with no reason turns into a phone call, which is what the system exists to avoid."*
 
-> **⚠ Conflict Q-B.** Four models. They differ on the number of steps, whether a reason is mandatory, and whether the decision notifies anyone. The prototype's Model A additionally **loses the record**, which is incompatible with `CA` rule 4 (*"every approval decision is logged — who, what, when, and why"*).
+> ✅ **Resolved by D-2: Model D.** One decision, by the company admin, with a **mandatory reason on rejection** and the **record kept and logged**. The prototype's Model A is explicitly rejected — losing the record was the defect, not a simplification. Models B and C stay reachable: the schema must allow a chain to be added later without migrating live approval history.
 
 ## 7.5 Supplier Order
 
@@ -581,7 +713,7 @@ INVITED ──► ACTIVE ──► DEACTIVATED
 | **Trigger** | An order exceeds the company's per-order limit `[C]`, or *(documented only)* requires custom embellishment or falls outside the default package `[D]` PRD FR-4.2. |
 | **Actors** | Customer Admin (approver), Employee (requester) |
 
-**This workflow cannot be specified further until Q-B is resolved.** Four incompatible models are documented in §7.4. What can be stated:
+✅ **Specified by D-2.** One decision, by the company admin. The four competing models in §7.4 are resolved.
 
 | Aspect | Status |
 |---|---|
@@ -589,11 +721,11 @@ INVITED ──► ACTIVE ──► DEACTIVATED
 | The approver is at the customer, not at PDT | `[C]` |
 | Approving must work **on a phone** — *"between meetings, on a site, in a van"* | `[C]` CA rule 5 |
 | Two admins approving the same order at once must not both succeed | `[C]` CA rule 6 |
-| Every decision is logged — who, what, when, why | `[D]` CA rule 4 — **the prototype deletes the record instead** |
+| Every decision is logged — who, what, when, why | `[DEC]` D-2 — **the record is kept.** The prototype's delete-on-decision is explicitly rejected |
 | The employee is notified either way | `[D]` CA §E |
-| Number of steps | **1, 2 or 3 — undecided** |
-| Whether a rejection reason is mandatory | **Undecided** |
-| What a rejected order becomes — editable draft? cancelled? resubmittable? | `[U]` |
+| Number of steps | **One** — company admin `[DEC]` D-2 |
+| Whether a rejection reason is mandatory | **Yes, mandatory** `[DEC]` D-2 |
+| What a rejected order becomes — editable draft? cancelled? resubmittable? | `[U]` — still open. D-5 confirms only that a rejected order raises no invoice |
 
 ---
 
@@ -712,15 +844,19 @@ INVITED ──► ACTIVE ──► DEACTIVATED
 | 4 | Customer revenue updated in CRM; receivables, balance and revenue recalculate | `[C]` PROTO:`confirmSplit` → `createInvoice` → `addCrmRevenue` → `recomputeEcon` |
 | 5 | Nightly two-way reconciliation matches platform invoices against e-conomic payments; debtors marked paid or overdue | `[C]` PRD FR-5.3, PROTO:`econrec` |
 
-### ⚠ Conflict Q-E — three invoice timings
+### ✅ Resolved by D-5 — at dispatch
+
+The invoice is raised when the **GLS label / barcode is created** in pack-and-ship. Not at checkout, not in a batch. No invoice on cancellation or rejection before dispatch. The three timings below are kept as the record of the conflict.
+
+#### The three timings that were found
 
 | Source | Timing |
 |---|---|
-| `PROTO:confirmSplit` | **At checkout.** A posted (`Bogført`) invoice is created the moment the employee confirms. `[C]` |
-| `PRD` FR-5.2 | *"Single Order Invoicing: immediate posting to e-conomic **upon order dispatch**."* `[D]` |
-| `PRD` FR-5.2 · `PROTO:samlefaktura` | **Daily batch (Samlefakturering):** finished print work grouped per customer into one consolidated invoice. `[C]` |
+| `PROTO:confirmSplit` | **At checkout.** A posted (`Bogført`) invoice is created the moment the employee confirms. `[C]` — ❌ **rejected by D-5** |
+| `PRD` FR-5.2 | *"Single Order Invoicing: immediate posting to e-conomic **upon order dispatch**."* `[D]` — ✅ **selected by D-5** |
+| `PRD` FR-5.2 · `PROTO:samlefaktura` | **Daily batch (Samlefakturering):** finished print work grouped per customer into one consolidated invoice. `[C]` — ❌ **not the model.** Whether it survives as optional consolidation for large customers is undecided |
 
-Invoicing at checkout means invoicing goods that have not been picked, may be out of stock, and may still be rejected in approval. **Stakeholder decision required.**
+Invoicing at checkout would have meant invoicing goods that had not been picked, might be out of stock, and might still be rejected in approval. D-5 avoids all three.
 
 ### Related
 
@@ -742,11 +878,13 @@ Invoicing at checkout means invoicing goods that have not been picked, may be ou
 | 1 | Employee picks the item, a reason (too small · too large · changed mind · faulty · wrong item delivered) and an outcome (exchange · refund · credit to the clothing account) | `[C]` PROTO:`retur` |
 | 2 | A **prepaid GLS return label** is issued | `[C]` PROTO:`startReturn` (mocked), PRD FR-4.6 |
 | 3 | Employee drops the parcel at a GLS parcel shop | `[C]` |
-| 4 | **Goods received, inspected, decision made** | **⚠ UNOWNED** |
-| 5 | **Refund, credit or replacement issued** | **⚠ UNOWNED** |
-| 6 | **Stock restocked** | `[D]` PRD FR-4.6 — *"inventory restocking workflows"*, no actor named |
+| 4 | **Warehouse receives and checks the returned parcel** | ✅ `[DEC]` D-6 |
+| 5 | **Platform admin approves the refund / credit note** | ✅ `[DEC]` D-6 — *the warehouse cannot refund on its own* |
+| 6 | **Platform admin triggers the restock** | ✅ `[DEC]` D-6 |
 
-> **⚠ Gap.** *"Who receives the parcel coming back, checks it and approves the refund? Currently unowned."* `[U]` WH. The warehouse explicitly **cannot** refund (`WH` "Must not"), and no other role is assigned it. **The return flow has a beginning and no end.**
+> ✅ **Closed by D-6.** Warehouse receives and checks; platform admin approves the refund or credit note and triggers the restock. Consistent with `WH`'s *"They cannot cancel or refund an order — that is an admin decision."*
+>
+> **Still to build:** a `returns` table, a warehouse receiving screen and an admin refund decision. **Still undecided:** whether a refund goes back as money, as credit to the clothing account, or as a replacement — the employee form offers all three.
 
 ---
 
@@ -1027,9 +1165,9 @@ Concurrent budget spend (BR-28) · double order submission (BR-29) · concurrent
 | Partial dispatch | Named as a *Should*; unspecified `[D]` |
 | Order cancellation by anyone | No cancellation flow exists in any source `[U]` |
 
-## 13.4 The returns dead end
+## 13.4 The returns dead end — ✅ closed
 
-Steps 4–6 of W-9 have no owner (§8.9). The warehouse is explicitly barred from refunding; no other role is assigned it. **A customer can start a return that nothing in the specified system can finish.**
+Steps 4–6 of W-9 previously had no owner. **D-6 assigns them:** the warehouse receives and checks the parcel; the platform admin approves the refund or credit and triggers the restock. The flow now has an end. What remains is build work, not an unanswered question.
 
 ---
 
