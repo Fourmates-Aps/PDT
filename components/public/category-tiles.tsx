@@ -5,6 +5,7 @@ import type { PublicCategory } from "@/lib/db/queries/public-catalogue";
 import { ProductImage } from "@/components/shop/product-image";
 import { Section, SectionHead } from "@/components/landing/section";
 import { categoryHref } from "@/lib/public-routes";
+import { categoryLabel } from "@/lib/content/categories";
 
 /**
  * The category grid.
@@ -52,14 +53,14 @@ export function CategoryTiles({
               <div className="aspect-[4/3] overflow-hidden bg-bone-100">
                 <ProductImage
                   src={category.image}
-                  alt={category.name}
+                  alt={categoryLabel(locale, category.name)}
                   className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                 />
               </div>
               <div className="flex items-center justify-between gap-3 px-5 py-4">
                 <div className="min-w-0">
                   <h3 className="truncate font-display text-[15px] font-semibold text-ink-900">
-                    {category.name}
+                    {categoryLabel(locale, category.name)}
                   </h3>
                   <p className="tabular mt-0.5 text-xs text-ink-500">
                     {t.count.replace("{n}", String(category.products))}

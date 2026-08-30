@@ -26,6 +26,8 @@ export function generateMetadata() {
  */
 const COUNTRIES = ["Danmark", "Schweiz", "Tyskland"];
 
+/* Their order exactly: company · CVR · EAN · first · last · address · zip ·
+   city · country · email · phone. */
 const FIELDS: FormField[] = [
   { name: "company", wide: true },
   { name: "cvr" },
@@ -36,8 +38,8 @@ const FIELDS: FormField[] = [
   { name: "zipcode" },
   { name: "city" },
   { name: "country", type: "select", options: COUNTRIES },
+  { name: "email", type: "email" },
   { name: "phone", type: "tel" },
-  { name: "email", type: "email", wide: true },
 ];
 
 export default async function ApplyPage() {
@@ -52,6 +54,21 @@ export default async function ApplyPage() {
             {t.title}
           </h1>
           <p className="mt-3 text-lead text-ink-500">{t.lead}</p>
+
+          {/*
+            * Kundetype. Their form carries this as a radio group with exactly
+            * one option — `company` — because the whole route is for trade
+            * accounts. A radio you cannot change is a control in name only, so
+            * it is stated rather than offered, under their own label.
+            */}
+          <p className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-border py-3">
+            <span className="font-display text-xs font-semibold uppercase tracking-[0.1em] text-ink-500">
+              {t.customerTypeLabel}
+            </span>
+            <span className="text-[15px] font-semibold text-ink-900">
+              {t.customerTypeValue}
+            </span>
+          </p>
 
           <p className="mt-6 flex gap-3 rounded-md border border-border bg-bone-100/60 px-4 py-3 text-sm text-ink-700">
             <Info className="mt-0.5 size-4 shrink-0 text-ink-400" aria-hidden="true" />

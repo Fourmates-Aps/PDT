@@ -6,12 +6,12 @@ import {
   listPublicProducts,
 } from "@/lib/db/queries/public-catalogue";
 import { Esg } from "@/components/landing/esg";
-import { Contact } from "@/components/landing/contact";
 import { Section, SectionHead } from "@/components/landing/section";
 import { Hero } from "@/components/public/hero";
 import { Welcome } from "@/components/public/welcome";
 import { StepsStrip } from "@/components/public/steps-strip";
 import { Promises } from "@/components/public/promises";
+import { CallbackStrip } from "@/components/public/callback-strip";
 import { CategoryTiles } from "@/components/public/category-tiles";
 import { PublicProductCard } from "@/components/public/product-card";
 
@@ -84,7 +84,7 @@ export default async function PublicFrontPage() {
         </Section>
       ) : null}
 
-      <Contact dict={dict} locale={locale} />
+      <CallbackStrip dict={dict} locale={locale} />
       <Promises dict={dict} />
     </>
   );

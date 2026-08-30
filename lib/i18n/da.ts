@@ -14,6 +14,7 @@ export const da = {
     langName: "Dansk",
     switchTo: "In English",
     switchToAria: "Skift sprog til engelsk",
+    language: "Sprog",
   },
   nav: {
     solution: "Løsning",
@@ -340,7 +341,9 @@ export const da = {
     help: {
       eyebrow: "Kontakt",
       title: "Har I brug for hjælp?",
-      lead: "Vi ringer gerne op. Så finder vi ud af, hvad der skal til.",
+      lead: "Vi ringer gerne op. Vi står klar til at afdække jeres behov.",
+      submit: "Send",
+      required: "Udfyld navn og mobilnummer, så vi kan ringe jer op.",
     },
     about: {
       title: "Om Profil Design Trading",
@@ -462,6 +465,8 @@ export const da = {
       title: "Ansøg om B2B-login",
       lead: "Formularen er forbeholdt virksomheder, der ønsker et B2B-forhandlerlogin.",
       submit: "Send ansøgning",
+      customerTypeLabel: "Kundetype",
+      customerTypeValue: "Erhverv",
       passwordNote:
         "Du vælger selv din adgangskode, når din ansøgning er godkendt — den kommer i en invitation på e-mail. Vi beder aldrig om en adgangskode i denne formular.",
     },

@@ -1,3 +1,5 @@
+import type { Locale } from "@/lib/i18n";
+
 /**
  * The shop navigation, as profildesigntrading.dk publishes it.
  *
@@ -5,6 +7,11 @@
  * plus Shop EL Teknik, which appears in the header on some pages. The ids are
  * kept because they are the stable handle on their side — if their catalogue is
  * ever imported, this is the join key.
+ *
+ * Danish is the source; English is a translation of it. Their site is Danish
+ * only, so nothing here was copied from an English original — these are ordinary
+ * garment words, translated so the /en front is actually in English rather than
+ * English chrome around a Danish menu.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * ⚠ THE `ours` MAPPING IS PROVISIONAL AND NEEDS PDT'S SIGN-OFF.
@@ -26,15 +33,21 @@
  * ────────────────────────────────────────────────────────────────────────────
  */
 
+/** A label that exists in both languages. */
+export type Label = Record<Locale, string>;
+
+export function label(value: Label, locale: Locale): string {
+  return value[locale] ?? value.da;
+}
+
 export type NavGroup = {
   /** Their category id, kept as the join key for a future import. */
   id: number;
-  /** Their label, in Danish, as printed. */
-  label: string;
-  /** URL segment on our site. */
+  label: Label;
+  /** URL segment on our site. Language-independent, like the ids. */
   slug: string;
   /** Their sub-categories, for the dropdown. */
-  children: string[];
+  children: Label[];
   /**
    * Which of OUR `products.category` values this group covers.
    * Empty means: we carry nothing in this group yet.
@@ -42,14 +55,25 @@ export type NavGroup = {
   ours: string[];
 };
 
+const l = (da: string, en: string): Label => ({ da, en });
+
 export const NAV_GROUPS: NavGroup[] = [
   {
     id: 3,
-    label: "Profiltøj",
+    label: l("Profiltøj", "Corporate wear"),
     slug: "profiltoej",
     children: [
-      "Skjorter", "Jakker", "T-shirt & Polo", "Bukser", "Strik", "Fleece",
-      "Sweatshirt", "Blazer", "Veste", "Sportstøj", "Tilbehør",
+      l("Skjorter", "Shirts"),
+      l("Jakker", "Jackets"),
+      l("T-shirt & Polo", "T-shirts & polos"),
+      l("Bukser", "Trousers"),
+      l("Strik", "Knitwear"),
+      l("Fleece", "Fleece"),
+      l("Sweatshirt", "Sweatshirts"),
+      l("Blazer", "Blazers"),
+      l("Veste", "Bodywarmers"),
+      l("Sportstøj", "Sportswear"),
+      l("Tilbehør", "Accessories"),
     ],
     ours: [
       "Skjorter", "Jakker", "T-shirts", "Poloshirts", "Fleece",
@@ -58,46 +82,70 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 5,
-    label: "Arbejdstøj",
+    label: l("Arbejdstøj", "Workwear"),
     slug: "arbejdstoej",
     children: [
-      "Jakker", "Veste", "T-shirt", "Polo", "Trøjer", "Skjorter", "Bukser",
-      "Shorts", "Knickers", "Overalls", "Kedeldragt", "Regntøj",
-      "High Vis Arbejdstøj", "Tilbehør", "Værnemidler",
+      l("Jakker", "Jackets"),
+      l("Veste", "Bodywarmers"),
+      l("T-shirt", "T-shirts"),
+      l("Polo", "Polos"),
+      l("Trøjer", "Jumpers"),
+      l("Skjorter", "Shirts"),
+      l("Bukser", "Trousers"),
+      l("Shorts", "Shorts"),
+      l("Knickers", "Knickers"),
+      l("Overalls", "Overalls"),
+      l("Kedeldragt", "Boiler suits"),
+      l("Regntøj", "Rainwear"),
+      l("High Vis Arbejdstøj", "High-vis workwear"),
+      l("Tilbehør", "Accessories"),
+      l("Værnemidler", "Protective equipment"),
     ],
     // Synlighed is the You feed's word for high-visibility.
     ours: ["Synlighed"],
   },
   {
     id: 7,
-    label: "Fodtøj",
+    label: l("Fodtøj", "Footwear"),
     slug: "fodtoej",
     children: [
-      "Sikkerhedssko", "Jobsko", "Indlægssål", "Strømper",
-      "Gummistøvler", "Træsko",
+      l("Sikkerhedssko", "Safety shoes"),
+      l("Jobsko", "Occupational shoes"),
+      l("Indlægssål", "Insoles"),
+      l("Strømper", "Socks"),
+      l("Gummistøvler", "Wellingtons"),
+      l("Træsko", "Clogs"),
     ],
     ours: [],
   },
   {
     id: 4,
-    label: "Firmagaver",
+    label: l("Firmagaver", "Business gifts"),
     slug: "firmagaver",
     children: [
-      "Gaver", "Gave 200", "Gave 300", "Gave 400",
-      "Gave 560", "Gave 640", "Gave 800", "Gave 1040",
+      l("Gaver", "Gifts"),
+      // Price points, so the number carries across untouched.
+      l("Gave 200", "Gift 200"),
+      l("Gave 300", "Gift 300"),
+      l("Gave 400", "Gift 400"),
+      l("Gave 560", "Gift 560"),
+      l("Gave 640", "Gift 640"),
+      l("Gave 800", "Gift 800"),
+      l("Gave 1040", "Gift 1040"),
     ],
     ours: ["Gaveartikler", "Rejseeffekter"],
   },
   {
     id: 6,
-    label: "Reklame artikler",
+    label: l("Reklame artikler", "Promotional items"),
     slug: "reklameartikler",
     children: [],
     ours: [],
   },
   {
     id: 76,
-    label: "Shop EL Teknik",
+    // A shop name, not a description — it stays as it is printed.
+    label: l("Shop EL Teknik", "Shop EL Teknik"),
     slug: "el-teknik",
     children: [],
     ours: [],
@@ -112,7 +160,7 @@ export const NAV_GROUPS: NavGroup[] = [
  * Reklame artikel; `Diverse` is the feed's own catch-all. None of the three is
  * a judgement worth making on PDT's behalf.
  */
-export const UNGROUPED_LABEL = "Øvrige";
+export const UNGROUPED_LABEL: Label = l("Øvrige", "Other");
 export const UNGROUPED_SLUG = "oevrige";
 
 const CLAIMED = new Set(NAV_GROUPS.flatMap((g) => g.ours));

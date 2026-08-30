@@ -7,14 +7,16 @@ import {
 } from "@/lib/db/queries/public-catalogue";
 import { CatalogueList } from "@/components/public/catalogue-list";
 import { decodeCategory } from "@/lib/public-routes";
+import { categoryLabel } from "@/lib/content/categories";
 
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ category: string }>;
 }): Promise<Metadata> {
-  const { category } = await params;
-  return { title: `${decodeCategory(category)} — Profil Design Trading` };
+  const [{ category }, locale] = await Promise.all([params, getLocale()]);
+  const name = categoryLabel(locale, decodeCategory(category));
+  return { title: `${name} — Profil Design Trading` };
 }
 
 /** One category of the range. */
@@ -46,6 +48,7 @@ export default async function CategoryPage({
       products={products}
       categories={categories}
       activeCategory={category}
+      heading={categoryLabel(locale, category)}
       dict={dict}
       locale={locale}
     />

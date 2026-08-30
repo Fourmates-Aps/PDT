@@ -14,6 +14,7 @@ export const en: Dictionary = {
     langName: "English",
     switchTo: "På dansk",
     switchToAria: "Switch language to Danish",
+    language: "Language",
   },
   nav: {
     solution: "Solution",
@@ -322,8 +323,10 @@ export const en: Dictionary = {
     },
     help: {
       eyebrow: "Contact",
-      title: "Need a hand?",
-      lead: "We are happy to call you back and work out what you need.",
+      title: "Do you need help?",
+      lead: "We would be happy to call you. We are ready to uncover your needs.",
+      submit: "Send",
+      required: "Add a name and a mobile number so we can call you back.",
     },
     about: {
       title: "About Profil Design Trading",
@@ -444,6 +447,8 @@ export const en: Dictionary = {
       title: "Apply for a B2B login",
       lead: "This form is for companies that want a B2B trade login.",
       submit: "Send application",
+      customerTypeLabel: "Customer type",
+      customerTypeValue: "Business",
       passwordNote:
         "You choose your own password once your application has been approved — it arrives in an invitation by email. We never ask for a password in this form.",
     },

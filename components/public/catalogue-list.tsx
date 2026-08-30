@@ -7,6 +7,7 @@ import type {
 import { Container } from "@/components/landing/section";
 import { PublicProductCard } from "./product-card";
 import { categoryHref } from "@/lib/public-routes";
+import { categoryLabel } from "@/lib/content/categories";
 
 /**
  * The range, filtered or not.
@@ -23,13 +24,21 @@ export function CatalogueList({
   products,
   categories,
   activeCategory,
+  heading,
   query,
   dict,
   locale,
 }: {
   products: PublicProduct[];
   categories: PublicCategory[];
+  /**
+   * The RAW `products.category` value, used only to mark the active chip.
+   * Never a translated label: the chips carry raw names, so comparing a
+   * translated one would silently stop matching on the English front.
+   */
   activeCategory?: string;
+  /** What to print at the top — already in the reader's language. */
+  heading?: string;
   query?: string;
   dict: Dictionary;
   locale: Locale;
@@ -38,7 +47,7 @@ export function CatalogueList({
 
   const title = query
     ? t.searchTitle.replace("{q}", query)
-    : (activeCategory ?? t.title);
+    : (heading ?? t.title);
 
   return (
     <div className="py-10 md:py-14">
@@ -83,7 +92,7 @@ export function CatalogueList({
                         : "border-bone-300 text-ink-700 hover:border-ink-900 hover:text-ink-900"
                     }`}
                   >
-                    {category.name}
+                    {categoryLabel(locale, category.name)}
                   </Link>
                 </li>
               );

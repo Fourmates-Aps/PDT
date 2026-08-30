@@ -1,6 +1,11 @@
 /** Shared contract between the public forms and the enquiry route handler. */
 
-export const ENQUIRY_KINDS = ["contact", "application", "newsletter"] as const;
+export const ENQUIRY_KINDS = [
+  "contact",
+  "callback",
+  "application",
+  "newsletter",
+] as const;
 export type EnquiryKind = (typeof ENQUIRY_KINDS)[number];
 
 /**
@@ -44,6 +49,15 @@ export type EnquiryResponse =
 export const REQUIRED: Record<EnquiryKind, EnquiryField[]> = {
   // profildesigntrading.dk/kontakt marks Navn, Telefon, E-mail, Emne and Besked.
   contact: ["name", "phone", "email", "subject", "message"],
+  /*
+   * The "Har du brug for hjælp?" strip: Virksomhed · Navn · E-mail · Mobilnr.
+   *
+   * Their version marks nothing required, which means SEND can be pressed on an
+   * empty form. Two are required here — a name and a number — because the whole
+   * promise of the strip is that somebody rings you back, and neither half of
+   * that works without them. Company and email stay optional, as theirs are.
+   */
+  callback: ["name", "phone"],
   // /ansoeg-om-bruger marks everything except EAN and Telefonnr.
   application: [
     "company",

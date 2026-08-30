@@ -1,16 +1,25 @@
 import Link from "next/link";
 import { Search, ShoppingBag, User } from "lucide-react";
 import type { Dictionary, Locale } from "@/lib/i18n";
-import { otherLocale } from "@/lib/i18n";
 import { Container } from "@/components/landing/section";
 import { BrandLogo } from "./brand-logo";
 import { categoryHref } from "@/lib/public-routes";
+import { MenuDismiss } from "./menu-dismiss";
+import { LocaleSwitch } from "./locale-switch";
 import {
   NAV_GROUPS,
   UNGROUPED_LABEL,
   UNGROUPED_SLUG,
+  label,
   ungroupedCategories,
 } from "@/lib/content/navigation";
+import { categoryLabel } from "@/lib/content/categories";
+
+/**
+ * One name for every menu in the header, so the browser keeps at most one open.
+ * See the note on StoreHeader.
+ */
+const MENU_GROUP = "pdt-header-menu";
 
 /** The live site's Info menu, in its order. */
 const INFO_LINKS: { href: string; label: (d: Dictionary) => string }[] = [
@@ -34,10 +43,20 @@ const INFO_LINKS: { href: string; label: (d: Dictionary) => string }[] = [
  * defines "match the look and feel" as structure and behaviour — so this is
  * their arrangement in our colours, deliberately.
  *
- * Still no JavaScript: the dropdowns are <details> elements, so they open by
- * keyboard, close with Escape and work with scripting off. That matters more
- * here than anywhere else in the app, because this is the surface strangers and
- * crawlers meet first.
+ * Still no JavaScript for the core behaviour: the dropdowns are <details>
+ * elements, so they open by keyboard and work with scripting off. That matters
+ * more here than anywhere else in the app, because this is the surface strangers
+ * and crawlers meet first.
+ *
+ * They share a `name`, which makes them an EXCLUSIVE ACCORDION: opening one
+ * closes any other. Without it every menu is independent, so two panels sit open
+ * on top of each other — which is exactly what happened. This is plain HTML, not
+ * script; a browser too old to know the attribute simply falls back to the old
+ * behaviour rather than breaking.
+ *
+ * Escape and click-outside are a progressive enhancement layered on top by
+ * <MenuDismiss>, because <details> does not do either on its own. An earlier
+ * version of this comment claimed it did. It does not.
  *
  * FAVORITTER IS DELIBERATELY ABSENT. Their cluster has four icons; this has
  * three. A wishlist is P3 in Backlog.md and does not exist, so the heart would
@@ -55,7 +74,6 @@ export function StoreHeader({
   categories: string[];
 }) {
   const t = dict.public.header;
-  const other = otherLocale(locale);
   const base = `/${locale}`;
 
   const stocked = new Set(categories);
@@ -63,6 +81,7 @@ export function StoreHeader({
 
   return (
     <header className="border-b border-bone-200 bg-bone-50/95 backdrop-blur-sm md:sticky md:top-0 md:z-50">
+      <MenuDismiss name={MENU_GROUP} />
       <Container className="flex flex-wrap items-center gap-x-4 gap-y-2.5 py-3 sm:gap-x-6 md:h-[76px] md:flex-nowrap md:py-0">
         <Link href={base} className="shrink-0" aria-label="Profil Design Trading">
           <BrandLogo tone="ink" className="h-9 w-auto sm:h-10" />
@@ -100,7 +119,7 @@ export function StoreHeader({
 
         {/* The icon cluster: icon over label, as theirs is. */}
         <nav className="ml-auto flex shrink-0 items-start gap-5 sm:gap-6">
-          <details className="group relative">
+          <details name={MENU_GROUP} className="group relative">
             <summary className="flex cursor-pointer list-none flex-col items-center gap-1 text-ink-500 transition-colors hover:text-ink-900 [&::-webkit-details-marker]:hidden">
               <span
                 className="flex h-5 flex-col justify-center gap-[3px]"
@@ -125,15 +144,6 @@ export function StoreHeader({
                   </Link>
                 </li>
               ))}
-              <li className="mt-1 border-t border-bone-200 pt-1 lg:hidden">
-                <Link
-                  href={`/${other}`}
-                  hrefLang={other}
-                  className="block px-4 py-2 text-sm text-ink-700 transition-colors hover:bg-bone-100 hover:text-ink-900"
-                >
-                  {dict.meta.switchTo}
-                </Link>
-              </li>
             </ul>
           </details>
 
@@ -159,14 +169,11 @@ export function StoreHeader({
             </span>
           </Link>
 
-          <Link
-            href={`/${other}`}
-            hrefLang={other}
-            aria-label={dict.meta.switchToAria}
-            className="hidden self-center text-sm text-ink-500 transition-colors hover:text-ink-900 lg:block"
-          >
-            {dict.meta.switchTo}
-          </Link>
+          <LocaleSwitch
+            current={locale}
+            label={dict.meta.language}
+            className="self-center"
+          />
         </nav>
       </Container>
 
@@ -177,11 +184,12 @@ export function StoreHeader({
           <ul className="flex w-max items-center gap-6 py-2.5 sm:w-auto sm:flex-wrap">
             {NAV_GROUPS.map((group) => {
               const mine = group.ours.filter((c) => stocked.has(c));
+              const groupLabel = label(group.label, locale);
               return (
                 <li key={group.slug} className="relative">
-                  <details className="group">
+                  <details name={MENU_GROUP} className="group">
                     <summary className="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap font-display text-xs font-semibold uppercase tracking-[0.1em] text-ink-800 transition-colors hover:text-highvis-700 [&::-webkit-details-marker]:hidden">
-                      {group.label}
+                      {groupLabel}
                       <span
                         className="text-[9px] text-ink-400 transition-transform group-open:rotate-180"
                         aria-hidden="true"
@@ -195,7 +203,7 @@ export function StoreHeader({
                         href={`${base}/katalog/gruppe/${group.slug}`}
                         className="block px-4 py-2 text-sm font-semibold text-ink-900 transition-colors hover:bg-bone-100"
                       >
-                        {t.allIn.replace("{group}", group.label)}
+                        {t.allIn.replace("{group}", groupLabel)}
                       </Link>
 
                       {mine.length > 0 ? (
@@ -206,7 +214,7 @@ export function StoreHeader({
                                 href={categoryHref(locale, category)}
                                 className="block px-4 py-2 text-sm text-ink-700 transition-colors hover:bg-bone-100 hover:text-ink-900"
                               >
-                                {category}
+                                {categoryLabel(locale, category)}
                               </Link>
                             </li>
                           ))}
@@ -221,7 +229,9 @@ export function StoreHeader({
                           </p>
                           {group.children.length > 0 ? (
                             <p className="mt-1.5 text-xs leading-relaxed text-ink-500">
-                              {group.children.join(" · ")}
+                              {group.children
+                                .map((child) => label(child, locale))
+                                .join(" · ")}
                             </p>
                           ) : null}
                         </div>
@@ -238,7 +248,7 @@ export function StoreHeader({
                   href={`${base}/katalog/gruppe/${UNGROUPED_SLUG}`}
                   className="whitespace-nowrap font-display text-xs font-semibold uppercase tracking-[0.1em] text-ink-500 transition-colors hover:text-ink-900"
                 >
-                  {UNGROUPED_LABEL}
+                  {label(UNGROUPED_LABEL, locale)}
                 </Link>
               </li>
             ) : null}

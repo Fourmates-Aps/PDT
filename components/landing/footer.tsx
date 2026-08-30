@@ -1,10 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Dictionary, Locale } from "@/lib/i18n";
-import { otherLocale } from "@/lib/i18n";
 import { Container } from "./section";
 import { BrandLogo, NewWaveBadge } from "@/components/public/brand-logo";
 import { NewsletterForm } from "@/components/public/newsletter-form";
+import { LocaleSwitchDark } from "@/components/public/locale-switch";
 import { COMPANY } from "@/lib/content/company";
 import type { Dictionary as Dict } from "@/lib/i18n";
 
@@ -29,7 +29,6 @@ export function Footer({
   dict: Dictionary;
   locale: Locale;
 }) {
-  const other = otherLocale(locale);
   const year = new Date().getFullYear();
 
   return (
@@ -120,15 +119,8 @@ export function Footer({
                   LinkedIn
                 </a>
               </li>
-              <li>
-                <Link
-                  href={`/${other}`}
-                  hrefLang={other}
-                  aria-label={dict.meta.switchToAria}
-                  className="hover:text-highvis-400"
-                >
-                  {dict.meta.switchTo}
-                </Link>
+              <li className="pt-1">
+                <LocaleSwitchDark current={locale} label={dict.meta.language} />
               </li>
             </ul>
 

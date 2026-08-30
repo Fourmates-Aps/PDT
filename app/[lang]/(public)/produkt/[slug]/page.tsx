@@ -7,6 +7,7 @@ import { getPublicProduct } from "@/lib/db/queries/public-catalogue";
 import { ProductImage } from "@/components/shop/product-image";
 import { Container } from "@/components/landing/section";
 import { categoryHref } from "@/lib/public-routes";
+import { categoryLabel } from "@/lib/content/categories";
 
 export async function generateMetadata({
   params,
@@ -56,7 +57,7 @@ export default async function PublicProductPage({
 
   const facts = [
     { label: t.brand, value: product.brand },
-    { label: t.category, value: product.category },
+    { label: t.category, value: categoryLabel(locale, product.category) },
     { label: t.material, value: product.material },
   ].filter((f) => f.value);
 

@@ -12,6 +12,7 @@ import {
   UNGROUPED_LABEL,
   UNGROUPED_SLUG,
   groupBySlug,
+  label,
   ungroupedCategories,
 } from "@/lib/content/navigation";
 import { CatalogueList } from "@/components/public/catalogue-list";
@@ -26,9 +27,9 @@ export async function generateMetadata({
 }: {
   params: Promise<{ group: string }>;
 }): Promise<Metadata> {
-  const { group } = await params;
-  const label = groupBySlug(group)?.label ?? UNGROUPED_LABEL;
-  return publicMetadata(() => ({ title: label }));
+  const [{ group }, locale] = await Promise.all([params, getLocale()]);
+  const name = groupBySlug(group)?.label ?? UNGROUPED_LABEL;
+  return publicMetadata(() => ({ title: label(name, locale) }));
 }
 
 /**
@@ -64,7 +65,7 @@ export default async function GroupPage({
     listPublicProducts({ categories, limit: 60 }),
   ]);
 
-  const label = group?.label ?? UNGROUPED_LABEL;
+  const heading = label(group?.label ?? UNGROUPED_LABEL, locale);
   const t = dict.public.groups;
 
   if (products.length === 0) {
@@ -72,7 +73,7 @@ export default async function GroupPage({
       <div className="py-10 md:py-14">
         <Container>
           <h1 className="text-h2 font-display font-semibold text-ink-900">
-            {label}
+            {heading}
           </h1>
 
           <div className="mt-6 max-w-[64ch] rounded-lg border border-border bg-card px-5 py-6">
@@ -87,7 +88,7 @@ export default async function GroupPage({
                   {t.coversTitle}
                 </p>
                 <p className="mt-2 text-sm text-ink-500">
-                  {group.children.join(" · ")}
+                  {group.children.map((c) => label(c, locale)).join(" · ")}
                 </p>
               </>
             ) : null}
@@ -116,7 +117,7 @@ export default async function GroupPage({
     <CatalogueList
       products={products}
       categories={allCategories}
-      activeCategory={label}
+      heading={heading}
       dict={dict}
       locale={locale}
     />
