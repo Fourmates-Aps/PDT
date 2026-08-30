@@ -354,6 +354,77 @@ export const en: Dictionary = {
         "Many of our customers have brought the bulk of their range and requirements to us, because we cover a lot of ground and hold the right prices in the market.",
     },
 
+    hero: {
+      slides: [
+        {
+          image: "hero-workwear",
+          title: "Shall we dress your business properly?",
+          body: "We want to be your preferred partner when it comes to buying and managing your company's clothing. We serve your employees directly, which means neither you nor one of your people has to spend valuable time or money handling the company's clothing purchases.",
+          cta: "Read more",
+          href: "/katalog/gruppe/arbejdstoej",
+        },
+        {
+          image: "hero-branding",
+          title: "Your specialist in branding",
+          body: "",
+          cta: "Read more",
+          href: "/professionelle-branding-losninger",
+        },
+      ],
+      previous: "Previous",
+      next: "Next",
+      goTo: "Go to slide {n}",
+      pause: "Pause",
+      play: "Play",
+      label: "Featured",
+    },
+    branding: {
+      title: "Professional branding solutions",
+      lead: "Five ways to put your brand on the things employees and customers handle every day.",
+      sections: [
+        {
+          image: "use",
+          title: "Use your brand",
+          body: [
+            "We supply branded products carrying your logo to companies, organisations, clubs and associations. Marketing a brand well matters, so the range is built around products that earn their place in everyday life — at work and outside it.",
+            "The products are not only practical; they are an effective way to promote the brand. With your logo or design on them you raise visibility and leave a positive impression on prospective customers.",
+          ],
+        },
+        {
+          image: "dress",
+          title: "Dress your brand",
+          body: [
+            "We specialise in corporate clothing with a logo for companies, organisations, clubs and associations. A professional impression and a dress code that holds go together, which is why the range covers both the relaxed and the formal.",
+            "The right clothing improves employees' confidence and how they carry themselves. So we offer a wide spread of sizes, colours and qualities, letting you find what suits your brand and your company.",
+          ],
+        },
+        {
+          image: "work",
+          title: "Work your brand",
+          body: [
+            "We make workwear carrying a name and logo. The range covers workwear with and without reflective detailing, along with many other functional garments worn through a working day. If you are going to be that visible anyway, it is worth showing clearly who you work for.",
+            "At New Wave Profile we supply high-quality workwear, and our team is on hand with personal service so you end up with the right choice for your company.",
+          ],
+        },
+        {
+          image: "give",
+          title: "Give your brand",
+          body: [
+            "We offer exclusive corporate gifts with a personal touch. Gifts are given in all sorts of settings where a relationship is being acknowledged — holidays, anniversaries, someone moving on, or a job well done.",
+            "Gifts from an employer carry real motivating weight, and gift-giving is deeply rooted in Danish working life. Browse the range here, or talk to us and we will find the right gift for your staff and business contacts together.",
+          ],
+        },
+        {
+          image: "show",
+          title: "Show your brand",
+          body: [
+            "We offer a large range of products for your brand and your message — roll-ups, exhibition stands and beach flags. The technology makes it possible to create large surfaces that are visible and hard to miss.",
+            "The mobile products are easy to position and easy to change the artwork on, so the message can always be matched to the audience. We also supply complete packages for digital meetings.",
+          ],
+        },
+      ],
+    },
+
     forms: {
       labels: {
         company: "Company name",

@@ -381,3 +381,31 @@ create policy enquiries_staff_handle on public.enquiries
 -- it. A rate-limit counter a client can read tells an attacker exactly how much
 -- budget they have left; one a client can write is not a rate limit.
 -- ===========================================================================
+
+-- ===========================================================================
+-- import_runs / import_changes
+--
+-- Supplier feed data, including dealer cost prices in the staged `before`/
+-- `after` payloads. Platform staff read it; nobody writes it from a browser.
+--
+-- The importer runs as the database owner and bypasses RLS, which is why there
+-- is no INSERT policy: a catalogue that a client could write to is a catalogue
+-- anyone with the anon key could rewrite.
+-- ===========================================================================
+drop policy if exists import_runs_staff_read on public.import_runs;
+create policy import_runs_staff_read on public.import_runs
+  for select to authenticated
+  using (public.auth_user_role() in ('admin', 'key_account_manager'));
+
+-- Approving or rejecting a catalogue replacement is an admin decision. A KAM
+-- can watch the queue; only an admin changes what the shop sells.
+drop policy if exists import_runs_admin_decide on public.import_runs;
+create policy import_runs_admin_decide on public.import_runs
+  for update to authenticated
+  using (public.auth_user_role() = 'admin')
+  with check (public.auth_user_role() = 'admin');
+
+drop policy if exists import_changes_staff_read on public.import_changes;
+create policy import_changes_staff_read on public.import_changes
+  for select to authenticated
+  using (public.auth_user_role() in ('admin', 'key_account_manager'));

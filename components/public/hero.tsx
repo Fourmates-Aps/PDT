@@ -1,7 +1,7 @@
 import Image from "next/image";
-import Link from "next/link";
 import type { Dictionary, Locale } from "@/lib/i18n";
-import { Container, Eyebrow } from "@/components/landing/section";
+import { Container } from "@/components/landing/section";
+import { HeroCarousel, type HeroSlide } from "./hero-carousel";
 
 /**
  * The hero band.
@@ -17,55 +17,45 @@ import { Container, Eyebrow } from "@/components/landing/section";
  * has ever been measured — has its second slide seen by almost nobody. The
  * second slide's artwork is not wasted; it heads /om-os.
  */
-export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
-  return (
-    <div className="relative isolate overflow-hidden bg-ink-900">
-      <Image
-        src="/images/photos/hero-workwear.jpg"
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        aria-hidden="true"
-        className="object-cover object-center"
-      />
-      {/*
-        * A left-weighted scrim rather than a flat wash: the photograph's subject
-        * is on the right, and dimming the whole frame to make text legible would
-        * throw away the half of the picture worth showing.
-        */}
-      <div
-        className="absolute inset-0 bg-gradient-to-r from-ink-900/95 via-ink-900/75 to-ink-900/25"
-        aria-hidden="true"
-      />
+/** Where each slide's artwork actually lives. */
+const HERO_IMAGES: Record<string, string> = {
+  "hero-workwear": "/images/photos/hero-workwear.jpg",
+  "hero-branding": "/images/photos/hero-branding.webp",
+};
 
-      <Container className="relative py-16 md:py-24 lg:py-28">
-        <div className="max-w-[46ch]">
-          <Eyebrow tone="dark">{dict.hero.eyebrow}</Eyebrow>
-          <div className="mt-4 h-[3px] w-14 rounded-sm bg-highvis-500" />
-          <h1 className="mt-6 text-display font-display font-bold text-balance text-bone-50">
-            {dict.hero.title}
-          </h1>
-          <p className="mt-6 max-w-[52ch] text-lead text-bone-50/80">
-            {dict.hero.lead}
-          </p>
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <a
-              href="#contact"
-              className="rounded-md bg-highvis-500 px-6 py-3.5 text-[15px] font-semibold text-ink-900 transition-colors hover:bg-highvis-400"
-            >
-              {dict.hero.ctaPrimary}
-            </a>
-            <Link
-              href={`/${locale}/katalog`}
-              className="rounded-md border border-bone-50/30 px-6 py-3.5 text-[15px] font-semibold text-bone-50 transition-colors hover:border-bone-50"
-            >
-              {dict.public.header.catalogue}
-            </Link>
-          </div>
-        </div>
-      </Container>
-    </div>
+/**
+ * The front page hero — their two slides, their words.
+ *
+ * A Server Component that resolves the dictionary down to exactly what the
+ * carousel needs before handing it over. Passing `dict` straight through would
+ * serialise the WHOLE dictionary into the page, which is the payload leak fixed
+ * earlier in this file's siblings — admin and pricing copy shipped to anonymous
+ * visitors.
+ */
+export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
+  const t = dict.public.hero;
+
+  const slides: HeroSlide[] = t.slides.map((slide) => ({
+    image: HERO_IMAGES[slide.image] ?? HERO_IMAGES["hero-workwear"],
+    title: slide.title,
+    body: slide.body,
+    cta: slide.cta,
+    href: `/${locale}${slide.href}`,
+  }));
+
+  return (
+    <HeroCarousel
+      slides={slides}
+      labels={{
+        eyebrow: dict.hero.eyebrow,
+        previous: t.previous,
+        next: t.next,
+        goTo: t.goTo,
+        pause: t.pause,
+        play: t.play,
+        label: t.label,
+      }}
+    />
   );
 }
 

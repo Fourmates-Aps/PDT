@@ -372,6 +372,87 @@ export const da = {
         "Mange af vores kunder har samlet størstedelen af deres sortiment og behov hos os, fordi vi dækker bredt og har de rigtige priser i markedet.",
     },
 
+    hero: {
+      /*
+       * Deres to slides, ordret. Overskrifterne står i almindelig sætningsform
+       * her og sættes i versaler med CSS: versaler i selve teksten læses bogstav
+       * for bogstav af nogle skærmlæsere, og det er en præsentation, ikke indhold.
+       */
+      slides: [
+        {
+          image: "hero-workwear",
+          title: "Skal vi klæde din virksomhed godt på?",
+          body: "Vi vil være din foretrukne samarbejdspartner, når det gælder indkøb og håndtering af virksomhedens tøj. Vi servicerer dine medarbejdere direkte, hvilket betyder at du eller én af dine medarbejdere ikke behøver at bruge dyrebar tid eller omkostninger på at håndtere virksomhedens tøjindkøb.",
+          cta: "Læs mere",
+          href: "/katalog/gruppe/arbejdstoej",
+        },
+        {
+          image: "hero-branding",
+          title: "Din specialist i branding",
+          body: "",
+          cta: "Læs mere",
+          href: "/professionelle-branding-losninger",
+        },
+      ],
+      previous: "Forrige",
+      next: "Næste",
+      goTo: "Gå til slide {n}",
+      pause: "Sæt pause",
+      play: "Afspil",
+      label: "Fremhævet",
+    },
+    branding: {
+      title: "Professionelle brandingløsninger",
+      lead: "Fem måder at sætte jeres brand på det, medarbejdere og kunder rører ved hver dag.",
+      /*
+       * Overskrifterne er engelske på begge sprog med vilje — de er New Wave
+       * Profiles slogans, ikke sætninger, og en oversættelse ville lave dem om
+       * til noget andet.
+       */
+      sections: [
+        {
+          image: "use",
+          title: "Use your brand",
+          body: [
+            "Vi tilbyder brandede produkter med logo til virksomheder, organisationer, klubber og foreninger. Vi mener, det er vigtigt at markedsføre jeres brand på en effektiv måde, og har derfor en bred vifte af produkter, der skaber værdi i hverdagen — på arbejde såvel som i fritiden.",
+            "Produkterne er ikke kun praktiske; de er også en effektiv måde at promovere brandet på. Med jeres logo eller design øger I synligheden og skaber et positivt indtryk hos potentielle kunder.",
+          ],
+        },
+        {
+          image: "dress",
+          title: "Dress your brand",
+          body: [
+            "Vi er specialister i firmatøj med logo til virksomheder, organisationer, klubber og foreninger. Et professionelt indtryk og en dresscode, der holder, hænger sammen — derfor er udvalget bredt nok til både det afslappede og det formelle.",
+            "Det rigtige tøj forbedrer medarbejdernes selvtillid og professionelle udstråling. Vi tilbyder derfor mange størrelser, farver og kvaliteter, så I kan finde det tøj, der passer til jeres brand og jeres virksomhed.",
+          ],
+        },
+        {
+          image: "work",
+          title: "Work your brand",
+          body: [
+            "Vi fremstiller arbejdstøj med navn og logo til virksomheder. Udvalget dækker arbejdstøj med og uden reflekser samt mange andre funktionelle beklædningsgenstande, som bæres i løbet af en arbejdsdag. Er man alligevel så synlig, er det værd at vise tydeligt, hvilken virksomhed man arbejder for.",
+            "Hos New Wave Profile tilbyder vi arbejdstøj af høj kvalitet, og vores team står klar med personlig service, så I får det rigtige valg til jeres virksomhed.",
+          ],
+        },
+        {
+          image: "give",
+          title: "Give your brand",
+          body: [
+            "Vi tilbyder eksklusive virksomhedsgaver med et personligt præg. Gaver gives i mange sammenhænge, hvor en relation skal bekræftes — ved ferie, højtider, jubilæum, fratrædelse eller som belønning for en god indsats.",
+            "Gaver fra arbejdsgiveren har en stærk motiverende effekt, og gavekulturen er dybt forankret i mange danske virksomheder. Se udvalget her på sitet, eller kontakt os, så vi sammen finder den rette gave til medarbejdere og forretningsforbindelser.",
+          ],
+        },
+        {
+          image: "show",
+          title: "Show your brand",
+          body: [
+            "Vi tilbyder et stort udvalg af produkter til jeres brand og budskab — roll-ups, messestande og beachflag. Teknologien gør det muligt at skabe store flader, der er synlige og opsigtsvækkende.",
+            "De mobile produkter er lette at placere og nemme at skifte motiv på, så budskabet altid kan tilpasses målgruppen. Vi tilbyder også komplette pakker til digitale møder.",
+          ],
+        },
+      ],
+    },
+
     forms: {
       labels: {
         company: "Firmanavn",

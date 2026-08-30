@@ -27,6 +27,10 @@ const INFO_LINKS: { href: string; label: (d: Dictionary) => string }[] = [
   { href: "/kontakt", label: (d) => d.public.contact.title },
   { href: "/handelsbetingelser", label: () => "Handelsbetingelser" },
   { href: "/webshop", label: (d) => d.public.webshop.title },
+  {
+    href: "/professionelle-branding-losninger",
+    label: (d) => d.public.branding.title,
+  },
   { href: "/kataloger", label: (d) => d.public.catalogues.title },
   { href: "/brands", label: (d) => d.public.brands.title },
   { href: "/stoerrelsesguide", label: (d) => d.public.sizeGuide.title },
