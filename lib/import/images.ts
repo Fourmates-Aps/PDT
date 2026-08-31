@@ -1,5 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { and, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { mediaAssets } from "@/lib/db/schema";
@@ -20,6 +22,104 @@ import { mediaAssets } from "@/lib/db/schema";
 const BUCKET = "catalogue";
 const MAX_ATTEMPTS = 3;
 const MAX_BYTES = 10 * 1024 * 1024;
+/** Redirect hops to follow before giving up. Each one is re-validated. */
+const MAX_REDIRECTS = 3;
+
+/**
+ * A failure that will never succeed — a 404, or a URL we refuse on principle.
+ *
+ * Separated from transient failures because they are counted differently: a
+ * permanent error burns the retry budget, a temporary one does not. Concurrency
+ * of 12 against you.dk produced 39 rate-limit failures out of 60, and counting
+ * those would have permanently abandoned 39 perfectly good images after three
+ * such nights.
+ */
+class PermanentImageError extends Error {}
+
+/**
+ * Whether an HTTP status will still be failing tomorrow.
+ *
+ * 404 and 410 are the server saying the file is gone. 429 and 5xx are it asking
+ * us to come back later, and those must not count against the retry budget.
+ * Other 4xx (401/403) usually mean hotlink protection, which is a standing
+ * policy rather than a blip — so they count.
+ */
+export function isPermanentStatus(status: number): boolean {
+  if (status === 429) return false;
+  if (status >= 500) return false;
+  return status >= 400;
+}
+
+/** Keep stored errors short and free of upstream response bodies. */
+function sanitiseError(message: string): string {
+  return message.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").slice(0, 200);
+}
+
+/**
+ * Refuse to fetch anything that is not a public internet address.
+ *
+ * These URLs arrive in a supplier's feed file, so they are third-party input
+ * reaching a server-side fetch — the classic SSRF shape. Without this, a feed
+ * naming http://169.254.169.254/... would have this process read cloud instance
+ * metadata and store it in a public bucket, and one naming an internal host
+ * would turn the importer into a proxy into our own network.
+ *
+ * Every hop is checked, not just the first: a public URL is free to redirect to
+ * a private one, which is why redirects are followed manually below.
+ */
+async function assertPublicUrl(raw: string): Promise<URL> {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new PermanentImageError("not a valid URL");
+  }
+
+  // Supplier CDNs all serve https. Allowing http would also allow a plaintext
+  // hop that anyone on the path could redirect.
+  if (url.protocol !== "https:") {
+    throw new PermanentImageError(`refused protocol ${url.protocol}`);
+  }
+
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  const addresses = isIP(host)
+    ? [{ address: host }]
+    : await lookup(host, { all: true }).catch(() => {
+        throw new PermanentImageError(`cannot resolve ${host}`);
+      });
+
+  for (const { address } of addresses) {
+    if (isPrivateAddress(address)) {
+      throw new PermanentImageError(`refused private address ${address}`);
+    }
+  }
+
+  return url;
+}
+
+function isPrivateAddress(ip: string): boolean {
+  if (ip === "0.0.0.0" || ip === "::" || ip === "::1") return true;
+
+  const v4 = ip.startsWith("::ffff:") ? ip.slice(7) : ip;
+  const parts = v4.split(".").map(Number);
+
+  if (parts.length === 4 && parts.every((n) => Number.isInteger(n))) {
+    const [a, b] = parts;
+    if (a === 127 || a === 10 || a === 0) return true;            // loopback, RFC1918, unspecified
+    if (a === 172 && b >= 16 && b <= 31) return true;             // RFC1918
+    if (a === 192 && b === 168) return true;                      // RFC1918
+    if (a === 169 && b === 254) return true;                      // link-local, incl. cloud metadata
+    if (a === 100 && b >= 64 && b <= 127) return true;            // CGNAT
+    return false;
+  }
+
+  const v6 = ip.toLowerCase();
+  return (
+    v6.startsWith("fe80") ||  // link-local
+    v6.startsWith("fc") ||    // unique local
+    v6.startsWith("fd")
+  );
+}
 
 function storageBase(): string {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -98,27 +198,58 @@ async function mirrorOne(sourceUrl: string): Promise<{
   contentType: string;
   bytes: number;
 }> {
-  const response = await fetch(sourceUrl, {
-    // Suppliers serve these to browsers; some reject an unidentified client.
-    headers: { accept: "image/*,*/*" },
-    signal: AbortSignal.timeout(30_000),
-  });
+  /*
+   * Redirects are followed BY HAND so every hop can be re-validated. Letting
+   * fetch follow them would check only the first URL, and a public URL is free
+   * to redirect to 169.254.169.254.
+   */
+  let target = await assertPublicUrl(sourceUrl);
+  let response: Response | null = null;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    response = await fetch(target, {
+      // Suppliers serve these to browsers; some reject an unidentified client.
+      headers: { accept: "image/*,*/*" },
+      redirect: "manual",
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (response.status < 300 || response.status >= 400) break;
+
+    const location = response.headers.get("location");
+    if (!location) throw new PermanentImageError("redirect without a location");
+    target = await assertPublicUrl(new URL(location, target).toString());
+    response = null;
+  }
+
+  if (!response) {
+    throw new PermanentImageError(`more than ${MAX_REDIRECTS} redirects`);
+  }
 
   if (!response.ok) {
-    throw new Error(`source returned ${response.status}`);
+    const message = `source returned ${response.status}`;
+    throw isPermanentStatus(response.status)
+      ? new PermanentImageError(message)
+      : new Error(message);
   }
 
   const contentType = response.headers.get("content-type") ?? "image/jpeg";
   if (!contentType.startsWith("image/")) {
     // Hotlink protection usually announces itself as an HTML error page with a
     // 200, which would otherwise be stored as a corrupt "image".
-    throw new Error(`source returned ${contentType}, not an image`);
+    throw new PermanentImageError(
+      `source returned ${contentType}, not an image`,
+    );
   }
 
   const body = new Uint8Array(await response.arrayBuffer());
-  if (body.byteLength === 0) throw new Error("source returned 0 bytes");
+  if (body.byteLength === 0) {
+    throw new PermanentImageError("source returned 0 bytes");
+  }
   if (body.byteLength > MAX_BYTES) {
-    throw new Error(`source returned ${body.byteLength} bytes, over the limit`);
+    throw new PermanentImageError(
+      `source returned ${body.byteLength} bytes, over the limit`,
+    );
   }
 
   const path = storagePathFor(sourceUrl);
@@ -155,6 +286,9 @@ async function mirrorOne(sourceUrl: string): Promise<{
 export async function mirrorPending(
   limit = 200,
   concurrency = 6,
+  /** Restrict to these source URLs. Used by checks so they do not drain the
+   *  live queue as a side effect of testing one URL. */
+  onlyUrls?: string[],
 ): Promise<MirrorResult> {
   const pending = await db
     .select({ id: mediaAssets.id, sourceUrl: mediaAssets.sourceUrl })
@@ -163,6 +297,7 @@ export async function mirrorPending(
       and(
         isNull(mediaAssets.mirroredAt),
         lt(mediaAssets.attempts, MAX_ATTEMPTS),
+        ...(onlyUrls ? [inArray(mediaAssets.sourceUrl, onlyUrls)] : []),
       ),
     )
     .limit(limit);
@@ -191,11 +326,21 @@ export async function mirrorPending(
         result.mirrored++;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        /*
+         * Only a permanent failure counts against MAX_ATTEMPTS. A rate limit or
+         * a 503 is the supplier asking us to come back later, and treating that
+         * as strike one would abandon a perfectly good image after three busy
+         * nights — which is exactly what a concurrency of 12 produced against
+         * you.dk: 39 rate-limit failures out of 60.
+         */
+        const permanent = error instanceof PermanentImageError;
         await db
           .update(mediaAssets)
           .set({
-            attempts: sql`${mediaAssets.attempts} + 1`,
-            lastError: message.slice(0, 300),
+            ...(permanent ? { attempts: sql`${mediaAssets.attempts} + 1` } : {}),
+            // Our own message, never raw upstream bytes: this column is
+            // queryable and a supplier error page should not land in it.
+            lastError: sanitiseError(message),
           })
           .where(eq(mediaAssets.id, item.id));
         result.failed++;

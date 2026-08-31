@@ -81,6 +81,28 @@ payment_intent.processing
 charge.refunded
 ```
 
+## Image mirroring
+
+Supplier images are hotlinked by default, which makes the catalogue's appearance
+depend on somebody else's uptime and their tolerance for being hotlinked.
+`npm run mirror` copies them into the `catalogue` storage bucket.
+
+```bash
+npm run mirror                 # register new URLs, mirror one batch
+npm run mirror -- --all        # keep going until nothing is pending
+npm run mirror -- --status     # report only, no network calls
+```
+
+Reads prefer a mirrored copy and fall back to the supplier URL for anything not
+yet copied, so a partial mirror degrades to today's behaviour rather than to
+blank frames. `products.primary_image` is never rewritten — the feed owns that
+column and the next import would overwrite it — so mirroring and importing
+cannot fight. The mapping lives in `media_assets`, keyed on the source URL, so a
+photo shared by 292 variants is fetched and stored once.
+
+Runs nightly at 04:45 UTC via `/api/internal/mirror`, bounded per run so a
+backlog drains over several nights instead of one request timing out.
+
 ## Scheduling
 
 Once per environment, after storing the service-role key in Vault:

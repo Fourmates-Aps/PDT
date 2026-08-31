@@ -13,7 +13,7 @@
 
 ## P1 — High (before public launch)
 
-- [ ]  Real product data + images from supplier feeds (see feed status below)
+- [~]  Real product data + images from supplier feeds — integration layer, normalised model and image mirroring are built and running for FH_YOU + FRISTADS; the other 8 suppliers are blocked on credentials/feed access, see feed status below
 - [ ]  Real product search (typos, synonyms, SKU, "no results" suggestions)
 - [ ]  Faceted filtering (size/colour/fit/price/material) + shareable URLs
 - [ ]  Return, exchange and refund flow

@@ -10,7 +10,7 @@ import {
  *
  *   npm run mirror                 register new URLs, then mirror a batch
  *   npm run mirror -- --all        keep going until nothing is pending
- *   npm run mirror -- --limit 50
+ *   npm run mirror -- --limit 50 --concurrency 12
  *   npm run mirror -- --status     report only, no network calls
  *
  * Safe to run repeatedly and safe to interrupt: work is claimed from the
@@ -46,10 +46,17 @@ async function main() {
   await report();
 
   const limit = value("limit", 200);
+  /*
+   * Tunable rather than fixed. Suppliers are not obliged to tolerate us pulling
+   * thousands of files at once, and getting rate-limited or blocked would cause
+   * the exact problem mirroring exists to prevent — so this stays modest by
+   * default and is raised deliberately, watching the failure count.
+   */
+  const concurrency = value("concurrency", 6);
   let rounds = 0;
 
   for (;;) {
-    const result = await mirrorPending(limit);
+    const result = await mirrorPending(limit, concurrency);
     if (result.claimed === 0) {
       console.log("\nNothing left to mirror.");
       break;

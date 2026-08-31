@@ -5,7 +5,13 @@
 -- and a Vault secret that only exist on a deployed project, so it is run by hand
 -- once per environment:
 --
---   psql "$DIRECT_URL" -v ref=<project-ref> -f supabase/schedules.sql
+--   psql "$DIRECT_URL" -v ref=<project-ref> -v app_url=https://<app-host> \
+--        -f supabase/schedules.sql
+--
+-- The image mirror calls the Next app directly (not an Edge Function), so it
+-- needs the app URL and the same shared secret the import uses:
+--
+--   select vault.create_secret('<PDT_CRON_SECRET>', 'pdt_cron_secret');
 --
 -- WHY VAULT AND NOT A LITERAL KEY. pg_cron stores each job's SQL in
 -- cron.job, readable by anyone who can read that table. Pasting the service-role
@@ -75,6 +81,34 @@ select cron.schedule(
     );
     $job$,
     format('https://%s.supabase.co/functions/v1/import-cron', :'ref')
+  )
+);
+
+-- Mirror supplier images into our own storage, after the import has landed.
+-- Bounded per run (see the route), so a backlog drains over several nights
+-- rather than one request timing out.
+select cron.unschedule('pdt-mirror-images')
+ where exists (select 1 from cron.job where jobname = 'pdt-mirror-images');
+
+select cron.schedule(
+  'pdt-mirror-images',
+  '45 4 * * *',
+  format(
+    $job$
+    select net.http_post(
+      url     := %L,
+      headers := jsonb_build_object(
+                   'Content-Type', 'application/json',
+                   'x-pdt-cron-secret', (
+                     select decrypted_secret from vault.decrypted_secrets
+                      where name = 'pdt_cron_secret'
+                   )
+                 ),
+      body    := '{}'::jsonb,
+      timeout_milliseconds := 290000
+    );
+    $job$,
+    format('%s/api/internal/mirror', :'app_url')
   )
 );
 
