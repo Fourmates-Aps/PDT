@@ -2,6 +2,7 @@ import "server-only";
 import { cacheKey as rawCacheKey, cached, invalidateTag } from "@/lib/cache";
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { resolveMirrored } from "@/lib/import/images";
 import { productVariants, products } from "@/lib/db/schema";
 
 /**
@@ -53,7 +54,23 @@ export const CATALOGUE_TAG = "catalogue";
  * a 500 on real traffic caused by a field being ADDED. Versioning the key means
  * a new shape simply misses the old entries instead of reading them.
  */
-const SHAPE = "v3";
+const SHAPE = "v4";
+
+/**
+ * Swap supplier image URLs for mirrored copies across a list of rows.
+ *
+ * One lookup for the whole page rather than one per product — a 60-product grid
+ * would otherwise make 60 round trips to answer the same question.
+ */
+async function serveMirroredImages<T extends { image: string | null }>(
+  rows: T[],
+): Promise<T[]> {
+  const mirrored = await resolveMirrored(rows.map((r) => r.image));
+  if (mirrored.size === 0) return rows;
+  return rows.map((r) =>
+    r.image && mirrored.has(r.image) ? { ...r, image: mirrored.get(r.image)! } : r,
+  );
+}
 
 const cacheKey = (name: string, args: unknown) =>
   rawCacheKey(`${SHAPE}:${name}`, args);
@@ -138,7 +155,7 @@ async function listPublicCategoriesUncached(
     .orderBy(desc(count(products.id)), asc(products.category))
     .limit(limit);
 
-  return rows;
+  return serveMirroredImages(rows);
 }
 
 /** Newest products, for the front page grid. */
@@ -186,12 +203,14 @@ async function listPublicProductsUncached(options?: {
     );
   }
 
-  return db
+  const rows = await db
     .select(PUBLIC_COLUMNS)
     .from(products)
     .where(and(...filters))
     .orderBy(desc(products.createdAt), asc(products.name))
     .limit(options?.limit ?? 12);
+
+  return serveMirroredImages(rows);
 }
 
 /**
@@ -308,16 +327,32 @@ async function getPublicProductUncached(
     for (const url of v.imageUrls ?? []) images.add(url);
   }
 
+  /*
+   * Supplier URLs are swapped for our mirrored copies where we have them.
+   *
+   * Done at read time rather than by rewriting products.primary_image, because
+   * the feed owns that column and the next import would overwrite it. Anything
+   * not yet mirrored keeps its supplier URL, so a partial mirror degrades to
+   * today's hotlinking rather than to blank frames.
+   */
+  const mirrored = await resolveMirrored([
+    ...images,
+    ...variants.flatMap((v) => v.imageUrls ?? []),
+  ]);
+  const serve = (url: string | null) =>
+    url === null ? null : (mirrored.get(url) ?? url);
+
   return {
     ...product,
+    image: serve(product.image),
     colours: [...colours].map(([name, hex]) => ({ name, hex })),
     sizes: sizes.sort((a, b) => sizeRank(a) - sizeRank(b)),
-    images: [...images],
+    images: [...images].map((url) => serve(url) as string),
     variants: variants.map((v) => ({
       colour: v.colourName,
       size: v.size,
       sku: v.sku,
-      image: v.imageUrls?.[0] ?? null,
+      image: serve(v.imageUrls?.[0] ?? null),
     })),
   };
 }

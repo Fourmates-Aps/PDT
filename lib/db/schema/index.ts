@@ -22,3 +22,4 @@ export * from "./audit";
 export * from "./enquiries";
 export * from "./imports";
 export * from "./payments";
+export * from "./media";

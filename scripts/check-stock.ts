@@ -6,23 +6,7 @@ import { listPackQueue } from "@/lib/db/queries/production";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/**
- * Two checkouts, one jacket. Exactly one may win.
- *
- *   npm run check:stock              the guard as it ships — expect PASS
- *   npm run check:stock -- --no-lock the same check without `for update`
- *
- * Drives the function placeOrder calls, in two genuinely concurrent transactions
- * against the real database. Running them one after the other would pass without
- * proving anything — the bug only lives in the window where both transactions
- * are open at once.
- *
- * `--no-lock` is the control: it must FAIL, placing two orders against one unit.
- * A concurrency test that cannot fail is not evidence of anything.
- *
- * Seeds its own throwaway product, variant, member and auth user, and removes
- * them again — including on the paths where it reports FAIL.
- */
+
 
 const TAG = "RACE-TEST";
 
@@ -208,6 +192,72 @@ async function main() {
         ? "PASS"
         : "FAIL — the shortfall must land on the later order",
     );
+  }
+
+  if (!NO_LOCK) {
+    /*
+     * Fourth scenario: a variant the supplier publishes NO stock for.
+     *
+     * You/F&H keep quantities in a B2B portal, so stock_qty stays 0 and means
+     * "no information", not "none left". These must stay orderable — PDT buys
+     * them in per order — while a tracked variant in the SAME cart must still
+     * be refused when it genuinely runs out.
+     */
+    await db.execute(sql`delete from order_lines where product_variant_id = ${variant.id}`);
+    await db.execute(sql`delete from orders where order_number like ${TAG + "%"}`);
+    await db.execute(sql`
+      update product_variants set stock_qty = 0, stock_tracked = false where id = ${variant.id}
+    `);
+
+    const untracked = await db.transaction((tx) =>
+      checkAvailabilityForUpdate(tx, [{ variantId: variant.id, qty: 500 }]),
+    );
+
+    console.log("\nUntracked variant (supplier publishes no stock), stock_qty 0:");
+    console.log(
+      `  order 500 → ${untracked.length === 0 ? "allowed" : `REFUSED (${JSON.stringify(untracked[0])})`}`,
+    );
+
+    // Two at once, both for far more than the stored 0.
+    const both = await Promise.all([
+      db.transaction((tx) => checkAvailabilityForUpdate(tx, [{ variantId: variant.id, qty: 50 }])),
+      db.transaction((tx) => checkAvailabilityForUpdate(tx, [{ variantId: variant.id, qty: 50 }])),
+    ]);
+    console.log(
+      `  two concurrent orders → ${both.every((r) => r.length === 0) ? "both allowed" : "one refused — wrong"}`,
+    );
+
+    // A second variant that IS tracked, to prove the guard still bites.
+    const [tracked] = await db.execute<{ id: string }>(sql`
+      insert into product_variants (product_id, colour_name, size, list_price_dkk, stock_qty, stock_tracked)
+      values (${product.id}, 'Blue', 'M', 100, 1, true)
+      returning id
+    `);
+
+    const mixed = await db.transaction((tx) =>
+      checkAvailabilityForUpdate(tx, [
+        { variantId: variant.id, qty: 99 },   // untracked — fine
+        { variantId: tracked.id, qty: 5 },    // tracked, only 1 in stock
+      ]),
+    );
+    console.log(
+      `  mixed cart (untracked 99 + tracked 5 of 1) → ${
+        mixed.length === 1 && mixed[0].variantId === tracked.id
+          ? "only the tracked line refused"
+          : `wrong: ${JSON.stringify(mixed)}`
+      }`,
+    );
+
+    console.log(
+      untracked.length === 0 &&
+        both.every((r) => r.length === 0) &&
+        mixed.length === 1 &&
+        mixed[0].variantId === tracked.id
+        ? "PASS"
+        : "FAIL",
+    );
+
+    await db.execute(sql`delete from product_variants where id = ${tracked.id}`);
   }
 
   // Cleanup, innermost first.
