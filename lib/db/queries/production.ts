@@ -109,10 +109,18 @@ export type PackLine = {
   quantity: number;
   logoPlacement: string | null;
   logoMethod: "embroidery" | "print" | "transfer" | null;
-  /** Supplier stock for this variant right now. */
+  /** Supplier stock for this variant right now. Meaningless when untracked. */
   stockQty: number;
   /** False when stock will not cover the line — it is waiting on a delivery. */
   available: boolean;
+  /**
+   * False when the supplier publishes no stock figures at all.
+   *
+   * The picker still cannot take these off a shelf, but the reason is different
+   * and the screen must say so: "bestilles hjem" is a normal step, whereas
+   * "waiting — 0 in stock" reads as something having gone wrong.
+   */
+  stockTracked: boolean;
 };
 
 export type PackOrder = {
@@ -179,6 +187,7 @@ export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
       size: productVariants.size,
       sku: productVariants.sku,
       stockQty: productVariants.stockQty,
+      stockTracked: productVariants.stockTracked,
       /*
        * What earlier orders have already claimed of this variant.
        *
@@ -230,7 +239,10 @@ export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
       logoPlacement: l.logoPlacement,
       logoMethod: l.logoMethod,
       stockQty: l.stockQty,
-      available: l.stockQty - l.committedAhead >= l.quantity,
+      stockTracked: l.stockTracked,
+      // An untracked variant is never "in stock" here: the goods are bought in
+      // per order, so the honest state is awaiting delivery, not on the shelf.
+      available: l.stockTracked && l.stockQty - l.committedAhead >= l.quantity,
     });
     byOrder.set(l.orderId, list);
   }

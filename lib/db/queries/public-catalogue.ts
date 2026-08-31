@@ -1,5 +1,5 @@
 import "server-only";
-import { cacheKey, cached, invalidateTag } from "@/lib/cache";
+import { cacheKey as rawCacheKey, cached, invalidateTag } from "@/lib/cache";
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { productVariants, products } from "@/lib/db/schema";
@@ -43,6 +43,20 @@ import { productVariants, products } from "@/lib/db/schema";
  * revalidatePublicCatalogue() and publish immediately.
  */
 export const CATALOGUE_TAG = "catalogue";
+
+/**
+ * Bump when the SHAPE of anything cached here changes.
+ *
+ * Cached entries outlive a deploy. When `variants` was added to
+ * PublicProductDetail the live cache still held payloads without it, and the
+ * product page threw "variants is not iterable" for every already-cached slug —
+ * a 500 on real traffic caused by a field being ADDED. Versioning the key means
+ * a new shape simply misses the old entries instead of reading them.
+ */
+const SHAPE = "v3";
+
+const cacheKey = (name: string, args: unknown) =>
+  rawCacheKey(`${SHAPE}:${name}`, args);
 const CATALOGUE = { tag: CATALOGUE_TAG, ttl: 3600 } as const;
 
 /** Retire every cached catalogue read. Call after a feed import publishes. */
@@ -217,6 +231,31 @@ export type PublicProductDetail = PublicProduct & {
   /** Distinct sizes. */
   sizes: string[];
   images: string[];
+  /**
+   * Which colour/size pairs actually exist, so the page can grey out the ones
+   * that do not. A flat list of colours and a flat list of sizes implies every
+   * combination is available, and for a 38-colour, 12-size style that is 456
+   * promises of which only 292 are real.
+   *
+   * Carries the supplier's item number and NOTHING about money. The reference
+   * site publishes item numbers on its logged-out product pages; price and
+   * stock stay behind the login (BR-39a), and no such column is selected here.
+   */
+  variants: {
+    colour: string | null;
+    size: string | null;
+    sku: string | null;
+    /**
+     * This variant's own photo, when the supplier publishes one.
+     *
+     * You/F&H do not: their export has no image field on a variant at all, so
+     * all 699 products carry the same two product shots on every colour. Fristads
+     * DO — their CSV has an image column per row. So this is null far more often
+     * than not, and the gallery must treat a colour-specific picture as a bonus
+     * rather than something it can rely on.
+     */
+    image: string | null;
+  }[];
 };
 
 /** One product, everything a visitor may see — and nothing else. */
@@ -244,6 +283,7 @@ async function getPublicProductUncached(
       colourName: productVariants.colourName,
       colourHex: productVariants.colourHex,
       size: productVariants.size,
+      sku: productVariants.sku,
       imageUrls: productVariants.imageUrls,
     })
     .from(productVariants)
@@ -273,6 +313,12 @@ async function getPublicProductUncached(
     colours: [...colours].map(([name, hex]) => ({ name, hex })),
     sizes: sizes.sort((a, b) => sizeRank(a) - sizeRank(b)),
     images: [...images],
+    variants: variants.map((v) => ({
+      colour: v.colourName,
+      size: v.size,
+      sku: v.sku,
+      image: v.imageUrls?.[0] ?? null,
+    })),
   };
 }
 

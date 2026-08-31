@@ -121,7 +121,7 @@ export function CartView({
                     * one line of eight is short means going back and guessing
                     * which one.
                     */}
-                  {l.available <= 0 ? (
+                  {l.available === null ? null : l.available <= 0 ? (
                     <p className="mt-1 text-xs font-semibold text-error">
                       {dict.checkout.soldOut}
                     </p>

@@ -1,0 +1,1 @@
+ALTER TABLE "product_variants" ADD COLUMN "stock_tracked" boolean DEFAULT true NOT NULL;

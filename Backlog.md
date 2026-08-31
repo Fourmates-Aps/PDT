@@ -58,7 +58,7 @@
 
 ## Supplier feed status (input to P1)
 
-- [x]  **You** — live feed received (700 products / 12,402 variants, incl. CO₂). Missing: API/cadence clarification.
+- [x]  **You** — connector built (`FH_YOU`), 699 products / 12,401 variants published through stage → diff → publish, all carrying supplier SKUs. The export is a FILE, not an API: F&H offer no system-to-system integration, so cadence still needs clarifying with the supplier. **The feed carries no stock** — 11,091 variants sit at 0 and cannot be ordered until that is decided.
 - [ ]  **Mascot** — EDI/API + FTP. Missing: FTP contact email + technical EDI contact.
 - [ ]  **Engel** — FTP (nightly) + EDI. Missing: contact email + EDI contact.
 - [ ]  **NWG / New Wave** (incl. Cottover, Clique) — GraphQL. Missing: token + assortmentId.

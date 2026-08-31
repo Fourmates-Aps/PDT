@@ -482,6 +482,7 @@ export async function getLastOrderForReorder(
       logoPlacement: orderLines.logoPlacement,
       logoMethod: orderLines.logoMethod,
       stockQty: productVariants.stockQty,
+      stockTracked: productVariants.stockTracked,
       variantActive: productVariants.isActive,
       productActive: products.isActive,
       price: orgPricing.priceDkk,
@@ -528,7 +529,9 @@ export async function getLastOrderForReorder(
         l.variantActive &&
         l.productActive &&
         l.price !== null &&
-        l.stockQty > 0,
+        // Untracked variants have no meaningful quantity — requiring > 0 would
+        // grey out every garment from a supplier who publishes no stock.
+        (!l.stockTracked || l.stockQty > 0),
     })),
   };
 }

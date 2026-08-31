@@ -49,6 +49,12 @@ function variantValues(
      * figure had just been confirmed. Both are lies the shop would repeat to a
      * customer.
      */
+    /*
+     * The feed decides whether stock means anything here. Set on every publish
+     * rather than only on insert, so a supplier who starts (or stops)
+     * publishing quantities flips their variants without manual intervention.
+     */
+    stockTracked: v.stockQty !== null,
     ...(v.stockQty === null
       ? {}
       : { stockQty: v.stockQty, stockUpdatedAt: new Date() }),
@@ -251,6 +257,7 @@ export async function publishChanges(
                ${values.size}::text, ${values.fit}::text,
                ${values.listPriceDkk}::numeric, ${values.netPriceDkk}::numeric,
                ${values.stockQty ?? null}::int,
+               ${values.stockTracked}::boolean,
                ${values.stockIncoming ? JSON.stringify(values.stockIncoming) : null}::jsonb,
                ${JSON.stringify(values.imageUrls ?? [])}::jsonb)`,
         );
@@ -265,6 +272,7 @@ export async function publishChanges(
             fit              = t.fit,
             list_price_dkk   = t.list_price,
             net_price_dkk    = t.net_price,
+            stock_tracked    = t.stock_tracked,
             stock_qty        = coalesce(t.stock_qty, v.stock_qty),
             stock_updated_at = case when t.stock_qty is null
                                     then v.stock_updated_at else now() end,
@@ -282,7 +290,8 @@ export async function publishChanges(
             updated_at       = now()
           from (values ${sql.join(rows, sql`, `)})
             as t(id, sku, ean, colour_name, colour_hex, size, fit,
-                 list_price, net_price, stock_qty, stock_incoming, image_urls)
+                 list_price, net_price, stock_qty, stock_tracked, stock_incoming,
+                 image_urls)
           where v.id = t.id
         `);
       }

@@ -55,12 +55,21 @@ export const OPEN_STATUSES = [
 
 export type Availability = {
   variantId: string;
-  /** What the supplier's last feed said they hold. */
+  /** What the supplier's last feed said they hold. Meaningless when untracked. */
   stockQty: number;
   /** Already promised to open orders. */
   committed: number;
-  /** stockQty − committed, floored at zero. */
-  available: number;
+  /**
+   * stockQty − committed, floored at zero — or NULL when the variant is not
+   * stock-tracked, meaning there is no limit to enforce because the supplier
+   * publishes no quantities and the goods are bought in per order.
+   *
+   * Null is not "unknown, so refuse". It is "this is not the kind of thing we
+   * count", and the caller must not treat it as zero.
+   */
+  available: number | null;
+  /** False when the supplier publishes no stock — see products schema. */
+  tracked: boolean;
 };
 
 /* Reusable so the lock, the read and the pack queue cannot drift apart. */
@@ -86,9 +95,10 @@ export async function getAvailability(
   const rows = await db.execute<{
     id: string;
     stock_qty: number;
+    stock_tracked: boolean;
     committed: number;
   }>(sql`
-    select v.id, v.stock_qty, ${COMMITTED} as committed
+    select v.id, v.stock_qty, v.stock_tracked, ${COMMITTED} as committed
       from product_variants v
      where v.id in ${variantIds}
   `);
@@ -100,7 +110,10 @@ export async function getAvailability(
         variantId: r.id,
         stockQty: Number(r.stock_qty),
         committed: Number(r.committed),
-        available: Math.max(0, Number(r.stock_qty) - Number(r.committed)),
+        available: r.stock_tracked
+          ? Math.max(0, Number(r.stock_qty) - Number(r.committed))
+          : null,
+        tracked: r.stock_tracked,
       },
     ]),
   );
@@ -142,19 +155,24 @@ export async function checkAvailabilityForUpdate(
   const rows = await tx.execute<{
     id: string;
     stock_qty: number;
+    stock_tracked: boolean;
     committed: number;
   }>(sql`
-    select v.id, v.stock_qty, ${COMMITTED} as committed
+    select v.id, v.stock_qty, v.stock_tracked, ${COMMITTED} as committed
       from product_variants v
      where v.id in ${ids}
   `);
 
-  const byId = new Map<string, number>(
-    rows.map((r) => [
-      r.id,
-      Math.max(0, Number(r.stock_qty) - Number(r.committed)),
-    ]),
-  );
+  /*
+   * Untracked variants are absent from this map entirely, and the loop below
+   * skips anything it cannot find a LIMIT for. Mapping them to 0 would refuse
+   * every order for a supplier who simply does not publish quantities.
+   */
+  const byId = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.stock_tracked) continue;
+    byId.set(r.id, Math.max(0, Number(r.stock_qty) - Number(r.committed)));
+  }
 
   /*
    * Quantities are summed per variant first. A cart can legitimately hold the
@@ -169,7 +187,11 @@ export async function checkAvailabilityForUpdate(
 
   const shortfalls: StockShortfall[] = [];
   for (const [variantId, qty] of totals) {
-    const available = byId.get(variantId) ?? 0;
+    const available = byId.get(variantId);
+    // Not in the map means untracked — nothing to enforce. A variant that does
+    // not exist at all was already rejected by pricing, which refuses to price
+    // anything outside the organisation's assortment.
+    if (available === undefined) continue;
     if (qty > available) {
       shortfalls.push({ variantId, wanted: qty, available });
     }

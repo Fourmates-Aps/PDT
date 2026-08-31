@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { Leaf, Lock } from "lucide-react";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { getPublicProduct } from "@/lib/db/queries/public-catalogue";
-import { ProductImage } from "@/components/shop/product-image";
+import { VariantExplorer } from "@/components/public/variant-explorer";
+import { ProductGallery } from "@/components/public/product-gallery";
+import { VariantSelectionProvider } from "@/components/public/variant-selection";
 import { Container } from "@/components/landing/section";
 import { categoryHref } from "@/lib/public-routes";
 import { categoryLabel } from "@/lib/content/categories";
@@ -71,15 +73,22 @@ export default async function PublicProductPage({
           {t.back}
         </Link>
 
+        {/*
+          The provider wraps BOTH columns so a colour click can reach the
+          picture. Everything inside stays server-rendered — it arrives as
+          children, not as serialised props.
+        */}
+        <VariantSelectionProvider>
         <div className="mt-5 grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14">
-          <div className="overflow-hidden rounded-lg border border-border bg-bone-100">
-            <ProductImage
-              src={product.image}
-              alt={product.name}
-              className="aspect-square size-full object-contain"
-              sizes="(min-width: 1024px) 45vw, 100vw"
-            />
-          </div>
+          <ProductGallery
+            images={product.images}
+            alt={product.name}
+            variants={product.variants}
+            labels={{
+              view: t.viewImage,
+              noColourPhoto: t.noColourPhoto,
+            }}
+          />
 
           <div>
             <p className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-highvis-700">
@@ -92,48 +101,22 @@ export default async function PublicProductPage({
               {t.sku}: {product.supplierSku}
             </p>
 
-            {product.colours.length > 0 ? (
-              <section className="mt-7">
-                <h2 className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-                  {t.colours}
-                </h2>
-                <ul className="mt-3 flex flex-wrap gap-2">
-                  {product.colours.map((colour) => (
-                    <li
-                      key={colour.name}
-                      className="flex items-center gap-2 rounded-sm border border-bone-300 px-2.5 py-1.5 text-xs text-ink-700"
-                    >
-                      {colour.hex ? (
-                        <span
-                          className="size-3.5 shrink-0 rounded-full border border-ink-200"
-                          style={{ backgroundColor: colour.hex }}
-                          aria-hidden="true"
-                        />
-                      ) : null}
-                      {colour.name}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            {product.sizes.length > 0 ? (
-              <section className="mt-6">
-                <h2 className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-                  {t.sizes}
-                </h2>
-                <ul className="mt-3 flex flex-wrap gap-1.5">
-                  {product.sizes.map((size) => (
-                    <li
-                      key={size}
-                      className="tabular rounded-sm border border-bone-300 px-2.5 py-1.5 text-xs text-ink-700"
-                    >
-                      {size}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
+            {/*
+              Interactive, not decorative. These used to be <li> chips styled
+              exactly like buttons and wired to nothing — see VariantExplorer.
+            */}
+            <VariantExplorer
+              colours={product.colours}
+              sizes={product.sizes}
+              variants={product.variants}
+              labels={{
+                colours: t.colours,
+                sizes: t.sizes,
+                itemNo: t.itemNo,
+                unavailable: t.variantUnavailable,
+                clear: t.clearSelection,
+              }}
+            />
 
             {facts.length > 0 ? (
               <dl className="mt-7 divide-y divide-border border-y border-border text-sm">
@@ -189,6 +172,7 @@ export default async function PublicProductPage({
             </section>
           </div>
         </div>
+        </VariantSelectionProvider>
       </Container>
     </div>
   );

@@ -108,6 +108,18 @@ export function PackOrderCard({
                         <Check className="size-3.5" />
                         {dict.inStock}
                       </span>
+                    ) : !line.stockTracked ? (
+                      /*
+                        Three states, not two. A supplier who publishes no stock
+                        figures leaves stockQty at 0, and showing "afventer
+                        levering (0 stk. på lager)" told the picker something had
+                        gone wrong when nothing had — the item is simply bought
+                        in for the order.
+                      */
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-500">
+                        <Truck className="size-3.5" />
+                        {dict.buyIn}
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-warning">
                         <AlertTriangle className="size-3.5" />

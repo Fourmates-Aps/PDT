@@ -51,8 +51,12 @@ export type PricedCartLine = {
    * What can still be promised — supplier stock MINUS what open orders already
    * claim. Not the raw feed figure: showing "12 in stock" while eleven are
    * spoken for is how the shop makes a promise the warehouse cannot keep.
+   *
+   * NULL when the variant is not stock-tracked: the supplier publishes no
+   * quantities and the goods are bought in per order, so there is no number to
+   * show and nothing to run out of.
    */
-  available: number;
+  available: number | null;
   co2Kg: number | null;
 };
 
@@ -170,7 +174,16 @@ export async function priceCart(items: CartItem[]): Promise<CartResult> {
         logos,
         qty: item.qty,
         lineTotal: round2((unit + decoration) * item.qty),
-        available: availability.get(p.variantId)?.available ?? 0,
+        /*
+         * Written out rather than `?? 0`, which would collapse the two very
+         * different nulls: an untracked variant (no limit) and a variant that
+         * is not in the map at all (unknown, treat as none).
+         */
+        available: (() => {
+          const row = availability.get(p.variantId);
+          if (!row) return 0;
+          return row.available;
+        })(),
         co2Kg: p.co2Available && p.co2Kg ? Number(p.co2Kg) : null,
       });
     }

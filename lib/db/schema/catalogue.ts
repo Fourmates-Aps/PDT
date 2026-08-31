@@ -95,6 +95,26 @@ export const productVariants = pgTable(
     listPriceDkk: numeric("list_price_dkk", { precision: 10, scale: 2 }).notNull(),
     netPriceDkk: numeric("net_price_dkk", { precision: 10, scale: 2 }),
     stockQty: integer("stock_qty").notNull().default(0),
+    /**
+     * Whether `stock_qty` means anything for this variant.
+     *
+     * FALSE means the supplier publishes no quantities at all — You/F&H keep
+     * theirs in a B2B portal and never put them in the export. For those
+     * variants a stored 0 is an absence of information, not an absence of goods,
+     * and treating it as "sold out" would make 11,091 orderable garments
+     * unbuyable.
+     *
+     * PDT buys in per order anyway — D-3 makes "Ankommet på lager" a customer-
+     * visible stage precisely because the goods are not on a shelf when the
+     * order is placed. So an untracked variant is ordered, then bought in. What
+     * changes is only WHERE the truth about stock lives: for a tracked variant
+     * it is this column, and for an untracked one it is the supplier's portal.
+     *
+     * Set by the importer from the feed on every publish, so it is self-healing:
+     * a supplier that starts publishing stock flips its variants to tracked
+     * without anyone editing anything.
+     */
+    stockTracked: boolean("stock_tracked").notNull().default(true),
     /** Incoming stock windows from supplier feeds, e.g. {"4w":200,"8w":400}. */
     stockIncoming: jsonb("stock_incoming"),
     /** Feeds are batch, not realtime — the UI must show "updated at", never "live". */

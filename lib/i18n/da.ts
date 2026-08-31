@@ -330,6 +330,12 @@ export const da = {
       material: "Materiale",
       colours: "Farver",
       sizes: "Størrelser",
+      itemNo: "Varenr.",
+      viewImage: "Vis billede",
+      noColourPhoto: "Leverandøren har kun ét produktbillede — det skifter ikke med farven.",
+      // Shown on a chip the visitor cannot press, so it explains WHY.
+      variantUnavailable: "Findes ikke i denne kombination",
+      clearSelection: "Ryd valg",
       co2: "CO₂ pr. stk.",
       co2Unavailable: "Ikke oplyst af leverandøren",
       // The live site's exact promise to an anonymous visitor.
@@ -1039,6 +1045,9 @@ export const da = {
       inStock: "På lager",
       waiting: "Afventer levering",
       stockCount: "{n} stk. på lager",
+      // Not an error: the supplier publishes no lagertal, so the item is
+      // bought in for the order. Showing "0 stk." here reads as a fault.
+      buyIn: "Bestilles hjem",
       blocked:
         "Kan ikke modtages endnu — én eller flere varer afventer levering fra leverandøren.",
       toArrived: "Modtaget på lager",

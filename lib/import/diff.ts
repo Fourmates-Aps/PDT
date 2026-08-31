@@ -140,6 +140,8 @@ export type ComparableVariant = {
   listPriceDkk: string | null;
   netPriceDkk: string | null;
   stockQty: number;
+  /** Whether the stored stockQty means anything — see the products schema. */
+  stockTracked: boolean;
   imageUrls: string[];
 };
 
@@ -204,6 +206,7 @@ export async function loadCurrent(
       listPriceDkk: v.listPriceDkk,
       netPriceDkk: v.netPriceDkk,
       stockQty: v.stockQty,
+      stockTracked: v.stockTracked,
       imageUrls: v.imageUrls ?? [],
     });
   }
@@ -276,6 +279,19 @@ function describeChanges(
     return match !== undefined && !match.sku && Boolean(v.sku);
   }).length;
   if (skuAdded) notes.push(`${skuAdded} varianter fik SKU`);
+
+  /*
+   * Whether the feed publishes stock at all is itself a change worth reporting.
+   * Without this the column added for You/F&H would never be written: the diff
+   * would call every product unchanged, publish would skip them, and 12,401
+   * variants would keep a default that says the opposite of the truth. Exactly
+   * the trap the SKU backfill fell into.
+   */
+  const trackingChanged = after.variants.filter((v) => {
+    const match = matchVariant(v, beforeByAlias);
+    return match !== undefined && match.stockTracked !== (v.stockQty !== null);
+  }).length;
+  if (trackingChanged) notes.push(`${trackingChanged} varianter skiftede lagerstyring`);
 
   const stockMoved = after.variants.some((v) => {
     // A feed with no stock figure has not changed the stock. Comparing null
