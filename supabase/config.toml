@@ -1,0 +1,16 @@
+project_id = "pdt"
+
+[functions.stripe-webhook]
+# Stripe cannot present a Supabase JWT, so this endpoint is public by necessity.
+# Its authentication is the signature on the request body, verified before the
+# function reads anything out of it. Turning this on would simply mean Stripe
+# gets 401s and every payment silently stops being recorded.
+verify_jwt = false
+
+[functions.notify]
+# Called by pg_cron and by nothing else. Keeping JWT verification on means a
+# stray public request cannot drain the outbox.
+verify_jwt = true
+
+[functions.import-cron]
+verify_jwt = true

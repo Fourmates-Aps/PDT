@@ -115,6 +115,21 @@ export function CartView({
                         : ""}
                     </p>
                   ) : null}
+                  {/*
+                    * A shortfall is worth showing while the quantity stepper is
+                    * still on screen. Finding out at the checkout button that
+                    * one line of eight is short means going back and guessing
+                    * which one.
+                    */}
+                  {l.available <= 0 ? (
+                    <p className="mt-1 text-xs font-semibold text-error">
+                      {dict.checkout.soldOut}
+                    </p>
+                  ) : l.available < l.qty ? (
+                    <p className="mt-1 text-xs font-semibold text-warning">
+                      {dict.checkout.onlyLeft.replace("{n}", String(l.available))}
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   type="button"

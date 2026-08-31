@@ -101,8 +101,13 @@ export const NAV_GROUPS: NavGroup[] = [
       l("Tilbehør", "Accessories"),
       l("Værnemidler", "Protective equipment"),
     ],
-    // Synlighed is the You feed's word for high-visibility.
-    ours: ["Synlighed"],
+    /*
+     * "Synlighed" is the You feed's word for high-visibility; "Arbejdstøj" is
+     * the category Fristads publishes under its own name. The second one only
+     * appeared once the Fristads importer ran — a mapping gap is invisible until
+     * a feed introduces the value.
+     */
+    ours: ["Synlighed", "Arbejdstøj"],
   },
   {
     id: 7,

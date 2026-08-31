@@ -10,6 +10,15 @@ import {
   organisations,
 } from "@/lib/db/schema";
 import { AuthorizationError, requireUser } from "@/lib/auth/guards";
+import {
+  checkAvailabilityForUpdate,
+  getAvailability,
+} from "@/lib/db/queries/availability";
+import { enqueueNotification, opsRecipient } from "@/lib/notifications";
+import {
+  createPersonalPaymentIntent,
+  stripeConfigured,
+} from "@/lib/payments/stripe";
 import { getMember, priceVariants } from "@/lib/db/queries/shop";
 import { cartLineKey, type CartItem } from "@/lib/cart";
 import {
@@ -38,7 +47,12 @@ export type PricedCartLine = {
   logos: CartLogo[];
   qty: number;
   lineTotal: number;
-  stockQty: number;
+  /**
+   * What can still be promised — supplier stock MINUS what open orders already
+   * claim. Not the raw feed figure: showing "12 in stock" while eleven are
+   * spoken for is how the shop makes a promise the warehouse cannot keep.
+   */
+  available: number;
   co2Kg: number | null;
 };
 
@@ -119,6 +133,14 @@ export async function priceCart(items: CartItem[]): Promise<CartResult> {
     );
     const byId = new Map(priced.map((p) => [p.variantId, p]));
 
+    /*
+     * What is left after every other open order, not the raw supplier figure.
+     * This is the number to SHOW. The number to TRUST is taken again under a
+     * row lock inside placeOrder — between rendering a cart and pressing the
+     * button, somebody else can take the last one.
+     */
+    const availability = await getAvailability(wanted.map((i) => i.variantId));
+
     const lines: PricedCartLine[] = [];
     const droppedVariantIds: string[] = [];
 
@@ -148,7 +170,7 @@ export async function priceCart(items: CartItem[]): Promise<CartResult> {
         logos,
         qty: item.qty,
         lineTotal: round2((unit + decoration) * item.qty),
-        stockQty: p.stockQty,
+        available: availability.get(p.variantId)?.available ?? 0,
         co2Kg: p.co2Available && p.co2Kg ? Number(p.co2Kg) : null,
       });
     }
@@ -194,9 +216,42 @@ export async function priceCart(items: CartItem[]): Promise<CartResult> {
   }
 }
 
+export type OutOfStockLine = {
+  productName: string;
+  colourName: string | null;
+  size: string | null;
+  wanted: number;
+  available: number;
+};
+
 export type PlaceOrderResult =
-  | { ok: true; orderNumber: string; needsApproval: boolean }
-  | { ok: false; message: string };
+  | {
+      ok: true;
+      orderNumber: string;
+      needsApproval: boolean;
+      /**
+       * Present only when the order has a personal share to collect. The
+       * browser confirms the payment with this; it is scoped to one intent and
+       * carries no account credentials.
+       */
+      paymentClientSecret?: string | null;
+    }
+  | { ok: false; message: string; outOfStock?: OutOfStockLine[] };
+
+/**
+ * Thrown inside the order transaction when stock ran out between the cart being
+ * priced and the order being placed.
+ *
+ * A throw rather than a returned value because it has to ROLL BACK: by the time
+ * this fires the order row and its lines may already be inserted, and an order
+ * that exists for goods nobody can supply is worse than a refused checkout.
+ */
+class OutOfStockError extends Error {
+  constructor(readonly lines: OutOfStockLine[]) {
+    super("outOfStock");
+    this.name = "OutOfStockError";
+  }
+}
 
 /**
  * Creates the order.
@@ -238,7 +293,35 @@ export async function placeOrder(items: CartItem[]): Promise<PlaceOrderResult> {
           ? "mobilepay"
           : "account";
 
-    const orderNumber = await db.transaction(async (tx) => {
+    const placed = await db.transaction(async (tx) => {
+      /*
+       * Stock is checked HERE, not in priceCart, and under a row lock.
+       *
+       * Anything checked before the transaction is a read that another checkout
+       * can invalidate before this one commits — which is exactly how two people
+       * both get told yes for the last jacket. See lib/db/queries/availability.ts.
+       */
+      const shortfalls = await checkAvailabilityForUpdate(
+        tx,
+        summary.lines.map((l) => ({ variantId: l.variantId, qty: l.qty })),
+      );
+
+      if (shortfalls.length > 0) {
+        const byVariant = new Map(summary.lines.map((l) => [l.variantId, l]));
+        throw new OutOfStockError(
+          shortfalls.map((s) => {
+            const line = byVariant.get(s.variantId);
+            return {
+              productName: line?.productName ?? "—",
+              colourName: line?.colourName ?? null,
+              size: line?.size ?? null,
+              wanted: s.wanted,
+              available: s.available,
+            };
+          }),
+        );
+      }
+
       const [{ seq }] = await tx.execute<{ seq: string }>(
         sql`select nextval('public.order_number_seq') as seq`,
       );
@@ -301,16 +384,106 @@ export async function placeOrder(items: CartItem[]): Promise<PlaceOrderResult> {
         });
       }
 
-      return number;
+      /*
+       * Mail is QUEUED inside the transaction, not sent.
+       *
+       * Enqueuing here ties the notification to the write: an order that rolls
+       * back never sends a confirmation, and one that commits always has its
+       * mail waiting. The supabase `notify` function delivers it afterwards, so
+       * a mail provider being down delays mail rather than failing checkout.
+       */
+      if (user.email) {
+        await enqueueNotification(tx, {
+          kind: "order_placed",
+          recipient: user.email,
+          subject: `Bestilling ${number}`,
+          payload: { orderNumber: number, total: summary.total },
+        });
+      }
+
+      if (needsApproval) {
+        /*
+         * TODO(Q-A3b): approvals go to the operations inbox because nothing in
+         * the schema says WHO approves for a given organisation. Routing this to
+         * the customer's own approver needs that question answered first;
+         * mailing the wrong person is worse than mailing a shared inbox.
+         */
+        const approver = opsRecipient();
+        if (approver) {
+          await enqueueNotification(tx, {
+            kind: "approval_requested",
+            recipient: approver,
+            subject: `Godkendelse afventer — ${number}`,
+            payload: {
+              orderNumber: number,
+              employee: user.email ?? member.id,
+              total: summary.total,
+            },
+          });
+        }
+      }
+
+      return { id: order.id, number };
     });
 
-    // TODO(payment): when personal > 0 this is where MobilePay is charged.
-    // The charge must be idempotent on a payment_intent_id and confirmed by a
-    // signed webhook before the order is treated as paid. Until then the amount
-    // is recorded on the order and nothing is collected.
+    /*
+     * The card charge happens AFTER the transaction, never inside it.
+     *
+     * A Stripe call inside `db.transaction` would hold row locks for the length
+     * of a network round trip to another company, and — worse — could not be
+     * rolled back: a database failure after the charge would leave money taken
+     * for an order that does not exist. Creating the intent afterwards means the
+     * worst case is an order with an unpaid intent, which is visible and
+     * fixable.
+     *
+     * The intent's idempotency key is the order id, so a checkout retried after
+     * a timeout attaches to the same intent instead of charging twice.
+     */
+    let paymentClientSecret: string | null = null;
 
-    return { ok: true, orderNumber, needsApproval };
+    if (summary.personal > 0 && stripeConfigured()) {
+      try {
+        const intent = await createPersonalPaymentIntent({
+          orderId: placed.id,
+          orderNumber: placed.number,
+          organisationId,
+          amountDkk: summary.personal,
+        });
+
+        // Registered through the same SQL contract the webhook uses, so the
+        // row exists before Stripe can report on it.
+        await db.execute(sql`
+          select public.create_payment(
+            ${placed.id}, ${intent.id}, ${summary.personal.toFixed(2)},
+            ${intent.amountMinor}, 'dkk'
+          )
+        `);
+
+        paymentClientSecret = intent.clientSecret;
+      } catch (error) {
+        // The order stands. Payment is a separate, retryable step, and losing a
+        // placed order because Stripe was briefly unreachable is the worse
+        // outcome for both sides.
+        console.error(
+          `Order ${placed.number}: could not create payment intent —`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
+    return {
+      ok: true,
+      orderNumber: placed.number,
+      needsApproval,
+      paymentClientSecret,
+    };
   } catch (error) {
+    // A shortfall is an ordinary outcome in a busy shop, not a crash. It carries
+    // the affected lines so the page can say WHICH item ran out and by how much,
+    // instead of a generic failure the employee cannot act on.
+    if (error instanceof OutOfStockError) {
+      return { ok: false, message: "outOfStock", outOfStock: error.lines };
+    }
     return { ok: false, message: message(error) };
   }
 }

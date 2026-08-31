@@ -128,6 +128,16 @@ The invoice is raised **when the GLS label / barcode is created** in pack-and-sh
 - The trigger lives in the same action that writes the parcel number — today `dispatchOrderAction` in `app/[lang]/dashboard/fulfilment-actions.ts`, where it is marked `TODO(invoice)`. **No invoice is raised yet: there is no `invoices` table and no e-conomic client, so the moment is named rather than faked.**
 - **Depends on Q-C2:** "dispatch" must correspond to an identifiable moment in the four-stage list.
 
+## D-11 · Stripe is the payment gateway *(stated 2026-08-31)*
+
+Card and MobilePay both go through **Stripe**. No other gateway is in scope.
+
+**Consequences**
+- `Backlog.md` P0 asks for "card + MobilePay with signed webhook + idempotency". Stripe covers MobilePay as a payment method in Denmark, so one integration serves both rails rather than two — **confirm MobilePay is enabled on PDT's Stripe account**, since it is region- and account-gated.
+- Only the EMPLOYEE'S share goes through Stripe. `orders.personal_amount_dkk` is the personally-paid overage; `account_amount_dkk` is billed to the company and becomes the e-conomic invoice at dispatch (D-5). A gateway charge for the full order total would bill the company's money to an employee's card.
+- The amount charged must be recomputed server-side from `org_pricing` at the moment of payment. `priceCart` already does this for checkout; the payment intent must use the same number and never one posted by the browser.
+- **Open — Q-L:** is the personal share captured at checkout or at dispatch? Danish practice is at dispatch, and Stripe models it directly as authorise-then-capture. D-5 already puts the invoice at dispatch, so capturing there keeps money and paperwork on the same event. Needs confirming.
+
 ## D-6 · Returns have an owner *(answers Q-F, closes the §13.4 dead end)*
 
 | Step | Owner |

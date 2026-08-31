@@ -1,4 +1,6 @@
 import { validateEnquiry, type EnquiryResponse } from "@/lib/enquiries";
+import { db } from "@/lib/db";
+import { enqueueNotification, opsRecipient } from "@/lib/notifications";
 import {
   ENQUIRY_LIMITS,
   PER_EMAIL_LIMIT,
@@ -118,12 +120,47 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   /*
-   * TODO(notify): the submission is stored but nobody is told about it. An
-   * application needs to reach whoever reviews it — Q-A3b, still open — and a
-   * contact enquiry promises an answer "within 24 hours on working days", which
-   * only holds if somebody sees it. Until the notification path exists, the
-   * review queue is the only place these appear.
+   * Tell somebody. The page promises an answer "within 24 hours on working
+   * days", which only holds if a human sees the submission.
+   *
+   * Queued, never sent inline: the visitor gets their confirmation as soon as
+   * the row is written, and a mail provider having a bad afternoon must not
+   * turn a stored enquiry into an error page. The supabase `notify` function
+   * delivers it.
+   *
+   * Newsletter sign-ups are deliberately not notified — nobody needs an email
+   * per subscriber, and the list is the record.
+   *
+   * TODO(Q-A3b): this goes to the operations inbox because nothing yet says who
+   * reviews B2B applications.
    */
+  const ops = opsRecipient();
+  if (ops && enquiry.kind !== "newsletter") {
+    try {
+      await enqueueNotification(db, {
+        kind: enquiry.kind === "application"
+          ? "application_received"
+          : "enquiry_received",
+        recipient: ops,
+        subject:
+          enquiry.kind === "application"
+            ? `Ny ansøgning: ${enquiry.company}`
+            : `Ny henvendelse fra ${enquiry.name}`,
+        payload:
+          enquiry.kind === "application"
+            ? { company: enquiry.company, contact: enquiry.email, cvr: enquiry.cvr }
+            : {
+                name: enquiry.name,
+                // Truncated: the mail is a prompt to go and look, not the record.
+                message: ("message" in enquiry ? enquiry.message : "")?.slice(0, 500) ?? "",
+              },
+      });
+    } catch (error) {
+      // The submission is already stored. Failing the request now would tell the
+      // visitor their message was lost when it was not.
+      console.error("[enquiry] could not queue notification", error);
+    }
+  }
 
   return json({ ok: true }, 200);
 }

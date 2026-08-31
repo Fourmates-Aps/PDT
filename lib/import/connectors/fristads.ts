@@ -59,9 +59,23 @@ const COLUMNS = {
 
 type Row = Record<string, string>;
 
-/** Headers vary in case, spacing and punctuation between exports. */
+/**
+ * Headers vary in case, spacing, punctuation AND diacritics between exports.
+ *
+ * The transliteration is the part that is easy to forget: a Danish export writes
+ * "Størrelse" and "Mærke", which lower-case to "størrelse" and "mærke" and match
+ * no ASCII alias at all. Folding æ/ø/å here means the alias list can stay ASCII
+ * and still match a Danish, Swedish or English export of the same file.
+ */
 const normaliseHeader = (header: string) =>
-  header.toLowerCase().replace(/[\s_\-.()/]/g, "");
+  header
+    .toLowerCase()
+    .replace(/æ/g, "ae")
+    .replace(/ø/g, "oe")
+    .replace(/å/g, "aa")
+    .replace(/ö/g, "oe")
+    .replace(/ä/g, "ae")
+    .replace(/[\s_\-.()/]/g, "");
 
 function buildIndex(headers: string[]): Map<string, string> {
   const index = new Map<string, string>();
@@ -255,33 +269,102 @@ export function parseProductCsv(
   return { products: [...byStyle.values()], skipped };
 }
 
+type FtpSession = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any;
+  host: string;
+  secure: boolean;
+};
+
+/**
+ * Open a connection, preferring TLS.
+ *
+ * Plain FTP sends the password in cleartext. `secure: true` is explicit FTPS
+ * (AUTH TLS) on the same port 21, so it is tried FIRST and only falls back if
+ * the server refuses — with the downgrade reported, never silent. A credential
+ * quietly sent in the clear is worse than a failed connection.
+ */
+async function connect(): Promise<FtpSession> {
+  const host = process.env.FRISTADS_FTP_HOST ?? "ftp.fristads.com";
+  const user = process.env.FRISTADS_FTP_USER;
+  const password = process.env.FRISTADS_FTP_PASSWORD;
+
+  if (!user || !password) {
+    throw new Error(
+      "Fristads FTP is not configured. Set FRISTADS_FTP_USER and " +
+        "FRISTADS_FTP_PASSWORD in the environment — never in the repo. " +
+        "To work without credentials, pass --file with a local export.",
+    );
+  }
+
+  // Imported lazily so this module can parse — and be tested — with no FTP
+  // client and no network.
+  const { Client } = await import("basic-ftp");
+
+  for (const secure of [true, false]) {
+    const client = new Client(30_000);
+    // Never verbose: basic-ftp echoes the control channel, which includes USER.
+    client.ftp.verbose = false;
+    try {
+      await client.access({ host, user, password, secure });
+      if (!secure) {
+        console.warn(
+          `[fristads] server refused TLS — connected in cleartext to ${host}`,
+        );
+      }
+      return { client, host, secure };
+    } catch (error) {
+      client.close();
+      if (!secure) throw error;
+      // Fall through and retry without TLS.
+    }
+  }
+
+  throw new Error("unreachable");
+}
+
+/**
+ * List a directory on the FTP.
+ *
+ * Exists because the integration note gives credentials but no paths, and
+ * guessing a filename is how an importer silently imports nothing. Run this
+ * first, find the real product and stock files, then set FRISTADS_FTP_PRODUCTS.
+ */
+export async function listRemote(
+  path = "/",
+): Promise<{ name: string; size: number; isDirectory: boolean }[]> {
+  const { client } = await connect();
+  try {
+    const entries = await client.list(path);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return entries.map((e: any) => ({
+      name: e.name,
+      size: e.size ?? 0,
+      isDirectory: e.isDirectory ?? false,
+    }));
+  } finally {
+    client.close();
+  }
+}
+
 async function downloadFromFtp(): Promise<{
   csv: string;
   xml: string;
   source: string;
 }> {
-  const host = process.env.FRISTADS_FTP_HOST ?? "ftp.fristads.com";
-  const user = process.env.FRISTADS_FTP_USER;
-  const password = process.env.FRISTADS_FTP_PASSWORD;
   const productPath = process.env.FRISTADS_FTP_PRODUCTS;
   const stockPath = process.env.FRISTADS_FTP_STOCK;
 
-  if (!user || !password || !productPath) {
+  if (!productPath) {
     throw new Error(
-      "Fristads FTP is not configured. Set FRISTADS_FTP_USER, " +
-        "FRISTADS_FTP_PASSWORD and FRISTADS_FTP_PRODUCTS (and optionally " +
-        "FRISTADS_FTP_STOCK) in the environment — never in the repo. " +
-        "To work without credentials, pass --file with a local export.",
+      "FRISTADS_FTP_PRODUCTS is not set — the path to the product CSV on the " +
+        "FTP. Run `npm run import -- FRISTADS --list` to see what is there.",
     );
   }
 
-  // Imported lazily so the module can be used for parsing — and tested — in
-  // environments with no FTP client and no network.
-  const { Client } = await import("basic-ftp");
-  const client = new Client(30_000);
+  const { client, host } = await connect();
 
   try {
-    await client.access({ host, user, password, secure: false });
 
     const { Writable } = await import("node:stream");
     const grab = async (path: string): Promise<string> => {

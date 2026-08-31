@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { orders } from "@/lib/db/schema";
+import { orders, organisationMembers } from "@/lib/db/schema";
+// auth.users is Supabase's own table, not ours — Drizzle ships the definition.
+import { authUsers } from "drizzle-orm/supabase";
 import { ROLES } from "@/lib/auth/roles";
 import { AuthorizationError, requireRole } from "@/lib/auth/guards";
 import { canDispatch, canMove, isStage, requiresDispatch } from "@/lib/production";
+import { enqueueNotification } from "@/lib/notifications";
 
 /**
  * Moving an order through fulfilment.
@@ -151,6 +154,7 @@ export async function dispatchOrderAction(
         status: orders.status,
         orderNumber: orders.orderNumber,
         dispatchedAt: orders.dispatchedAt,
+        memberId: orders.memberId,
       })
       .from(orders)
       .where(eq(orders.id, orderId))
@@ -175,6 +179,29 @@ export async function dispatchOrderAction(
         updatedAt: new Date(),
       })
       .where(eq(orders.id, orderId));
+
+    /*
+     * Tell the person who ordered it. Looked up rather than assumed: the member
+     * who placed the order is not the person operating the warehouse screen
+     * that dispatches it.
+     */
+    if (current.memberId) {
+      const [recipient] = await db
+        .select({ email: authUsers.email })
+        .from(organisationMembers)
+        .innerJoin(authUsers, eq(organisationMembers.userId, authUsers.id))
+        .where(eq(organisationMembers.id, current.memberId))
+        .limit(1);
+
+      if (recipient?.email) {
+        await enqueueNotification(db, {
+          kind: "order_dispatched",
+          recipient: recipient.email,
+          subject: `Din bestilling ${current.orderNumber} er sendt`,
+          payload: { orderNumber: current.orderNumber, parcel },
+        });
+      }
+    }
 
     revalidateFulfilment();
     return {

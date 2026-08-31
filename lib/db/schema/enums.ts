@@ -97,3 +97,26 @@ export const supplierOrderStatus = pgEnum("supplier_order_status", [
   "received",
   "cancelled",
 ]);
+
+/**
+ * Where a payment attempt has got to.
+ *
+ * Deliberately NOT Stripe's own vocabulary one-for-one: Stripe has a dozen
+ * intent statuses and this table only needs the ones that change what PDT does.
+ * The mapping lives in the SQL function, so both runtimes apply the same one.
+ */
+export const paymentStatus = pgEnum("payment_status", [
+  "requires_payment",
+  "processing",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "refunded",
+]);
+
+export const notificationStatus = pgEnum("notification_status", [
+  "pending",
+  "sending",
+  "sent",
+  "failed",
+]);

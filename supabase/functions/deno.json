@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "stripe": "npm:stripe@17.7.0",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.49.4"
+  },
+  "nodeModulesDir": "auto",
+  "lock": false
+}

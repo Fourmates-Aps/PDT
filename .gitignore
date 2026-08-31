@@ -41,3 +41,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Deno pulls npm deps into the functions dir (deno.json nodeModulesDir: auto).
+supabase/functions/node_modules

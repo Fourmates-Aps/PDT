@@ -3,12 +3,12 @@
 
 ## P0 — Critical (blockers — must be done before real payments)
 
-- [ ]  Backend + database (replaces the prototype's localStorage)
-- [ ]  Auth + server-side authorization (replaces the role picker)
-- [ ]  Relational product/variant/stock model with SKU per variant
-- [ ]  Server-side price calculation (never from the browser)
-- [ ]  Payment integration (card + MobilePay) with signed webhook + idempotency
-- [ ]  Order/transaction database
+- [x]  Backend + database (replaces the prototype's localStorage)
+- [x]  Auth + server-side authorization (replaces the role picker)
+- [~]  Relational product/variant/stock model — built, but variants key on EAN; there is still **no SKU column per variant**
+- [x]  Server-side price calculation (never from the browser)
+- [ ]  Payment integration via **Stripe** (card + MobilePay) with signed webhook + idempotency — decided 2026-08-31, see `docs/PRODUCT-WORKFLOW-SPEC.md` D-11
+- [x]  Order/transaction database
 - [ ]  Stock control/reservation (avoid overbooking)
 
 ## P1 — High (before public launch)

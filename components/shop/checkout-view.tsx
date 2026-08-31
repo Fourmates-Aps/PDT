@@ -8,6 +8,7 @@ import {
   placeOrder,
   priceCart,
   type CartSummary,
+  type OutOfStockLine,
 } from "@/app/[lang]/(shop)/actions";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +27,7 @@ export function CheckoutView({
   const [summary, setSummary] = useState<CartSummary | null>(null);
   const [placed, setPlaced] = useState<Placed | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shortfalls, setShortfalls] = useState<OutOfStockLine[]>([]);
   const [loading, startLoading] = useTransition();
   const [submitting, startSubmit] = useTransition();
   const t = dict.checkout;
@@ -60,6 +62,7 @@ export function CheckoutView({
 
   function onPlace() {
     setError(null);
+    setShortfalls([]);
     startSubmit(async () => {
       const result = await placeOrder(items);
       if (result.ok) {
@@ -68,11 +71,25 @@ export function CheckoutView({
           needsApproval: result.needsApproval,
         });
         clear();
-      } else {
-        setError(
-          result.message === "personalBlocked" ? t.personalBlocked : t.failed,
-        );
+        return;
       }
+
+      if (result.message === "outOfStock" && result.outOfStock) {
+        /*
+         * Somebody took the last one between loading this page and pressing
+         * the button. Show WHICH item and how many are left, then re-price so
+         * the figures on screen stop contradicting the refusal.
+         */
+        setShortfalls(result.outOfStock);
+        setError(t.outOfStockTitle);
+        const repriced = await priceCart(items);
+        if (repriced.ok) setSummary(repriced);
+        return;
+      }
+
+      setError(
+        result.message === "personalBlocked" ? t.personalBlocked : t.failed,
+      );
     });
   }
 
@@ -203,9 +220,23 @@ export function CheckoutView({
           ) : null}
 
           {error ? (
-            <p role="alert" className="mt-3 rounded-md border border-error/30 bg-error/5 px-3 py-2.5 text-sm text-error">
-              {error}
-            </p>
+            <div role="alert" className="mt-3 rounded-md border border-error/30 bg-error/5 px-3 py-2.5 text-sm text-error">
+              <p>{error}</p>
+              {shortfalls.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-xs">
+                  {shortfalls.map((line) => (
+                    <li key={`${line.productName}-${line.colourName}-${line.size}`}>
+                      {t.outOfStockLine
+                        .replace("{product}", line.productName)
+                        .replace("{colour}", line.colourName ?? "")
+                        .replace("{size}", line.size ?? "")
+                        .replace("{wanted}", String(line.wanted))
+                        .replace("{available}", String(line.available))}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           ) : null}
 
           <button

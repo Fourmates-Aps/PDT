@@ -1314,6 +1314,12 @@ export const da = {
         "MobilePay er ikke koblet på endnu, så den private del registreres men trækkes ikke.",
       personalBlocked:
         "Personlige køb er slået fra for jeres virksomhed, og beløbet overstiger din ramme.",
+      outOfStockTitle:
+        "Der er ikke nok på lager til at gennemføre bestillingen.",
+      // {wanted} og {available} er antal, ikke beløb.
+      outOfStockLine: "{product}, {colour} {size} — du bad om {wanted}, {available} tilbage.",
+      soldOut: "Udsolgt",
+      onlyLeft: "Kun {n} tilbage",
       total: "Total",
       capNote: "Beløbet er over loftet på {limit} og sendes til godkendelse.",
       place: "Send bestilling",

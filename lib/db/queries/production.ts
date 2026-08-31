@@ -172,8 +172,32 @@ export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
       colourName: productVariants.colourName,
       size: productVariants.size,
       stockQty: productVariants.stockQty,
+      /*
+       * What earlier orders have already claimed of this variant.
+       *
+       * Checkout refuses to oversell, so this is normally 0 for the order at the
+       * front of the queue. It stops being 0 when the supplier's feed REVISES
+       * STOCK DOWN after orders were taken — the one case placement-time checks
+       * cannot prevent, and the case a picker needs to be warned about.
+       *
+       * "Earlier" is by placement time, so the queue is first-come-first-served
+       * and two pickers reading the same screen see the same answer.
+       */
+      committedAhead: sql<number>`
+        coalesce((
+          select sum(other.quantity)
+            from order_lines other
+            join orders oo on oo.id = other.order_id
+           where other.product_variant_id = ${orderLines.productVariantId}
+             and other.id <> ${orderLines.id}
+             and oo.status in ('pending_approval', 'booked', 'arrived_at_warehouse', 'sent_to_print')
+             and oo.dispatched_at is null
+             and (oo.created_at, oo.id) < (${orders.createdAt}, ${orders.id})
+        ), 0)::int
+      `,
     })
     .from(orderLines)
+    .innerJoin(orders, eq(orderLines.orderId, orders.id))
     .innerJoin(
       productVariants,
       eq(orderLines.productVariantId, productVariants.id),
@@ -198,7 +222,7 @@ export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
       logoPlacement: l.logoPlacement,
       logoMethod: l.logoMethod,
       stockQty: l.stockQty,
-      available: l.stockQty >= l.quantity,
+      available: l.stockQty - l.committedAhead >= l.quantity,
     });
     byOrder.set(l.orderId, list);
   }

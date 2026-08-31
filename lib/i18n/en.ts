@@ -1286,6 +1286,10 @@ export const en: Dictionary = {
         "MobilePay is not connected yet, so the personal part is recorded but not charged.",
       personalBlocked:
         "Personal purchases are disabled for your company, and the amount exceeds your allowance.",
+      outOfStockTitle: "There is not enough stock to complete this order.",
+      outOfStockLine: "{product}, {colour} {size} — you asked for {wanted}, {available} left.",
+      soldOut: "Sold out",
+      onlyLeft: "Only {n} left",
       total: "Total",
       capNote: "This is above the {limit} cap and will be sent for approval.",
       place: "Place order",
