@@ -52,24 +52,86 @@ export type ComparableProduct = {
   variants: ComparableVariant[];
 };
 
-/**
- * How a variant is recognised across imports.
- *
- * `product_variants` has no supplier-SKU column, so EAN is the natural key —
- * both Fristads and TEE JAYS publish one per size. When a supplier omits it,
- * colour and size together identify the variant well enough, and the fallback is
- * deterministic so the same variant matches itself on the next run.
- */
-export function variantKey(v: {
+/** The three things that can identify a variant, best first. */
+export type VariantIdentity = {
+  sku?: string | null;
   ean: string | null;
   colourName: string | null;
   size: string | null;
-}): string {
-  return v.ean?.trim() || `${v.colourName ?? ""}|${v.size ?? ""}`;
+};
+
+/**
+ * How a variant is recognised across imports.
+ *
+ * PRECEDENCE: supplier SKU, then EAN, then colour+size. Each is weaker than the
+ * one before it. A SKU is the supplier's own permanent handle. An EAN is stable
+ * but absent on 179 variants in the You feed. Colour+size is not identity at
+ * all — it is a last resort, and a supplier renaming "Marine" to "Navy" breaks
+ * it, which is exactly the failure the SKU column was added to end.
+ *
+ * Keys are PREFIXED because the namespaces overlap: a supplier whose SKU is the
+ * digits of someone else's EAN would otherwise collide silently.
+ */
+export function variantKey(v: VariantIdentity): string {
+  return variantAliases(v)[0];
+}
+
+/**
+ * Every key a variant may be recognised by, strongest first.
+ *
+ * Matching on ALL of them is what makes adding the SKU column safe. Rows written
+ * before this column existed have `sku = null` and are known only by their EAN;
+ * the feed now offers a SKU as well. Matching on the primary key alone would
+ * find nothing, and the next import would report the entire catalogue as
+ * discontinued and re-create it — losing the stock, the images and the order
+ * history hanging off those variant ids.
+ *
+ * With aliases, the old row matches on `ean:` and the update writes its SKU, so
+ * the run after that matches on `sku:` and never needs the fallback again.
+ */
+export function variantAliases(v: VariantIdentity): string[] {
+  const keys: string[] = [];
+  const sku = v.sku?.trim();
+  const ean = v.ean?.trim();
+
+  if (sku) keys.push(`sku:${sku}`);
+  if (ean) keys.push(`ean:${ean}`);
+  keys.push(`cs:${v.colourName ?? ""}|${v.size ?? ""}`);
+
+  return keys;
+}
+
+/** The existing variant a feed variant refers to, or undefined. */
+export function matchVariant<T extends VariantIdentity>(
+  feed: VariantIdentity,
+  existingByAlias: Map<string, T>,
+): T | undefined {
+  for (const alias of variantAliases(feed)) {
+    const found = existingByAlias.get(alias);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Index existing variants by every alias they answer to.
+ *
+ * A weaker alias never overwrites a stronger one's entry, so a colour+size
+ * collision between two variants cannot steal a match from the variant that
+ * owns the SKU.
+ */
+export function indexByAlias<T extends VariantIdentity>(variants: T[]): Map<string, T> {
+  const byAlias = new Map<string, T>();
+  for (const v of variants) {
+    for (const alias of variantAliases(v)) {
+      if (!byAlias.has(alias)) byAlias.set(alias, v);
+    }
+  }
+  return byAlias;
 }
 
 export type ComparableVariant = {
-  sku: string;
+  sku: string | null;
   ean: string | null;
   colourName: string | null;
   colourHex: string | null;
@@ -133,7 +195,7 @@ export async function loadCurrent(
     const sku = productById.get(v.productId);
     if (!sku) continue;
     byId.get(sku)?.variants.push({
-      sku: variantKey(v),
+      sku: v.sku,
       ean: v.ean,
       colourName: v.colourName,
       colourHex: v.colourHex,
@@ -169,35 +231,58 @@ function describeChanges(
   if (before.primaryImage !== after.primaryImage) notes.push("billede ændret");
   if (!before.isActive) notes.push("genaktiveret");
 
-  const beforeSkus = new Set(before.variants.map(variantKey));
-  const afterSkus = new Set(after.variants.map(variantKey));
-  const added = [...afterSkus].filter((s) => !beforeSkus.has(s)).length;
-  const removed = [...beforeSkus].filter((s) => !afterSkus.has(s)).length;
+  /*
+   * Compared through aliases, not a single key. A stored variant may be known
+   * only by its EAN while the feed now also carries a SKU; matching on one key
+   * would call the same variant both "new" and "discontinued" in the same run.
+   */
+  const beforeByAlias = indexByAlias(before.variants);
+  const afterByAlias = indexByAlias(after.variants);
+
+  const added = after.variants.filter(
+    (v) => !matchVariant(v, beforeByAlias),
+  ).length;
+  const removed = before.variants.filter(
+    (v) => !matchVariant(v, afterByAlias),
+  ).length;
   if (added) notes.push(`${added} nye varianter`);
   if (removed) notes.push(`${removed} varianter udgået`);
 
   // Price is called out by name because it is the change a human most wants to
   // see before it reaches a customer's shop.
-  const beforePrices = new Map(
-    before.variants.map((v) => [variantKey(v), money(v.listPriceDkk)]),
-  );
   const moved = after.variants.filter((v) => {
-    const was = beforePrices.get(variantKey(v));
-    return was !== undefined && was !== money(v.listPriceDkk);
+    const was = matchVariant(v, beforeByAlias);
+    return was !== undefined && money(was.listPriceDkk) !== money(v.listPriceDkk);
   });
   if (moved.length > 0) {
     const example = moved[0];
-    const was = beforePrices.get(variantKey(example));
+    const was = matchVariant(example, beforeByAlias);
     notes.push(
-      `pris ${was} → ${money(example.listPriceDkk)}${
+      `pris ${money(was?.listPriceDkk ?? null)} → ${money(example.listPriceDkk)}${
         moved.length > 1 ? ` (+${moved.length - 1} flere)` : ""
       }`,
     );
   }
 
+  /*
+   * A variant gaining a SKU it did not have is a real change and must be
+   * reported — otherwise the product is "unchanged", no change row is written,
+   * publish never touches it, and the SKU is never backfilled. Rows loaded
+   * before the column existed would keep matching on EAN forever and never
+   * acquire the stronger identity.
+   */
+  const skuAdded = after.variants.filter((v) => {
+    const match = matchVariant(v, beforeByAlias);
+    return match !== undefined && !match.sku && Boolean(v.sku);
+  }).length;
+  if (skuAdded) notes.push(`${skuAdded} varianter fik SKU`);
+
   const stockMoved = after.variants.some((v) => {
-    const key = variantKey(v);
-    const match = before.variants.find((b) => variantKey(b) === key);
+    // A feed with no stock figure has not changed the stock. Comparing null
+    // against a stored number would report "lagerantal opdateret" on every
+    // single run of a stockless feed like You/F&H.
+    if (v.stockQty === null) return false;
+    const match = matchVariant(v, beforeByAlias);
     return match !== undefined && match.stockQty !== v.stockQty;
   });
   if (stockMoved && notes.length === 0) notes.push("lagerantal opdateret");

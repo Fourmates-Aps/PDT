@@ -246,7 +246,14 @@ export function parseProductCsv(
 
     const ean = pick(row, index, COLUMNS.ean);
     const variant: FeedVariant = {
-      sku: pick(row, index, COLUMNS.variantSku) ?? ean ?? supplierSku,
+      /*
+       * NOT falling back to supplierSku. That is the STYLE number, shared by
+       * every colour and size of the product — using it here would give a dozen
+       * variants the same SKU and collide on product_variants_product_sku_key.
+       * Null is the truthful answer, and matching falls back to EAN then
+       * colour+size.
+       */
+      sku: pick(row, index, COLUMNS.variantSku) ?? ean,
       ean,
       colourName: pick(row, index, COLUMNS.colourName),
       colourHex: pick(row, index, COLUMNS.colourHex),

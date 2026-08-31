@@ -24,7 +24,8 @@
     "check:stock": "tsx --conditions=react-server scripts/check-stock.ts",
     "check:payments": "tsx --conditions=react-server scripts/check-payments.ts",
     "check:functions": "cd supabase/functions && deno check --config deno.json stripe-webhook/index.ts notify/index.ts import-cron/index.ts",
-    "check:webhook": "node scripts/check-webhook.mjs"
+    "check:webhook": "node scripts/check-webhook.mjs",
+    "check:sku": "tsx --conditions=react-server scripts/check-sku.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

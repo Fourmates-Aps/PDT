@@ -64,6 +64,13 @@
       "when": 1788172721217,
       "tag": "0008_payments_and_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788174237808,
+      "tag": "0009_variant_sku",
+      "breakpoints": true
     }
   ]
 }

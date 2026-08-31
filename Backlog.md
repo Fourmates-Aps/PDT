@@ -5,11 +5,11 @@
 
 - [x]  Backend + database (replaces the prototype's localStorage)
 - [x]  Auth + server-side authorization (replaces the role picker)
-- [~]  Relational product/variant/stock model — built, but variants key on EAN; there is still **no SKU column per variant**
+- [x]  Relational product/variant/stock model — variants now carry the supplier SKU; matching resolves SKU → EAN → colour+size
 - [x]  Server-side price calculation (never from the browser)
 - [ ]  Payment integration via **Stripe** (card + MobilePay) with signed webhook + idempotency — decided 2026-08-31, see `docs/PRODUCT-WORKFLOW-SPEC.md` D-11
 - [x]  Order/transaction database
-- [ ]  Stock control/reservation (avoid overbooking)
+- [x]  Stock control/reservation (avoid overbooking) — checked under a row lock at placement; `npm run check:stock`
 
 ## P1 — High (before public launch)
 

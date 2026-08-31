@@ -1,0 +1,2 @@
+ALTER TABLE "product_variants" ADD COLUMN "sku" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "product_variants_product_sku_key" ON "product_variants" USING btree ("product_id","sku") WHERE "product_variants"."sku" is not null;

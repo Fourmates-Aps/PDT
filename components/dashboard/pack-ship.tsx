@@ -91,7 +91,9 @@ export function PackOrderCard({
                       {line.productName}
                     </span>
                     <span className="block text-xs text-ink-500">
-                      {[line.colourName, line.size].filter(Boolean).join(" · ")}
+                      {[line.sku, line.colourName, line.size]
+                        .filter(Boolean)
+                        .join(" · ")}
                       {line.logoPlacement
                         ? ` · ${describePlacements(line.logoPlacement, placements)}`
                         : ""}

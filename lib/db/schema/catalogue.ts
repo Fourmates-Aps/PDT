@@ -74,6 +74,19 @@ export const productVariants = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
+    /**
+     * The supplier's own article number for this exact variant.
+     *
+     * The stable identity. EAN is absent on 179 variants in the You feed and
+     * colour/size is not identity at all — a supplier renaming "Marine" to
+     * "Navy" would otherwise read as one variant discontinued and another
+     * created, taking the stock and the order history with it.
+     *
+     * Nullable because not every supplier publishes one and the seeded demo
+     * catalogue has none. Matching falls back to EAN, then colour+size — see
+     * variantAliases() in lib/import/diff.ts.
+     */
+    sku: text("sku"),
     ean: text("ean"),
     colourName: text("colour_name"),
     colourHex: text("colour_hex"),
@@ -101,6 +114,16 @@ export const productVariants = pgTable(
     uniqueIndex("product_variants_ean_key")
       .on(t.ean)
       .where(sql`${t.ean} is not null`),
+    /*
+     * Scoped to the product, not global: a SKU is the SUPPLIER's namespace, and
+     * two suppliers may legitimately use the same string. Variants carry no
+     * supplier_id — the product does — so the product is the tightest scope
+     * available here, and it catches the case that actually matters: the same
+     * SKU twice inside one style.
+     */
+    uniqueIndex("product_variants_product_sku_key")
+      .on(t.productId, t.sku)
+      .where(sql`${t.sku} is not null`),
     index("product_variants_product_idx").on(t.productId),
   ],
 ).enableRLS();

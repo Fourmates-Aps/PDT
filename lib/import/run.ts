@@ -5,6 +5,7 @@ import { importChanges, importRuns } from "@/lib/db/schema";
 import { diffFeed, loadCurrent, type Change } from "./diff";
 import { publishChanges } from "./publish";
 import { fristadsConnector } from "./connectors/fristads";
+import { fhYouConnector } from "./connectors/fh-you";
 import type { Connector, ConnectorOptions } from "./types";
 
 /**
@@ -19,6 +20,7 @@ import type { Connector, ConnectorOptions } from "./types";
 
 export const CONNECTORS: Record<string, Connector> = {
   FRISTADS: fristadsConnector,
+  FH_YOU: fhYouConnector,
 };
 
 export type StagedRun = {

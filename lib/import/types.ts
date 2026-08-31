@@ -11,8 +11,17 @@
  */
 
 export type FeedVariant = {
-  /** The supplier's own SKU. Unique within the supplier. */
-  sku: string;
+  /**
+   * The supplier's own article number for this variant. Unique within the
+   * supplier, and the strongest identity a variant has.
+   *
+   * NULL when the supplier publishes none. Deliberately not filled in with a
+   * substitute: a synthesised SKU looks authoritative, matches nothing on the
+   * supplier's side, and — if derived from the product — collides with every
+   * other variant of the same style. Matching falls back to EAN, then
+   * colour+size, which is honest about how weak the identity is.
+   */
+  sku: string | null;
   ean: string | null;
   colourName: string | null;
   colourHex: string | null;
@@ -21,7 +30,17 @@ export type FeedVariant = {
   /** Decimal strings, not numbers — money never goes through a float. */
   listPriceDkk: string | null;
   netPriceDkk: string | null;
-  stockQty: number;
+  /**
+   * On-hand quantity, or NULL when the supplier does not publish stock at all.
+   *
+   * Null is not zero. The You/F&H feed carries no stock — it lives in their B2B
+   * shop UI only (Supplier_data_capabilities.md) — and writing 0 would mark the
+   * whole catalogue unorderable the moment checkout started checking
+   * availability. Writing an invented number would be worse: it promises goods
+   * that may not exist. Null means "this feed has no opinion", and publish
+   * leaves the stored figure untouched.
+   */
+  stockQty: number | null;
   /**
    * Incoming stock by horizon, e.g. `{ "4w": 200, "8w": 400 }`.
    *

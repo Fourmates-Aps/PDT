@@ -98,6 +98,12 @@ export function toColumns(cards: BoardCard[]): BoardColumn[] {
 export type PackLine = {
   id: string;
   productName: string;
+  /**
+   * The supplier's article number. What a picker reads off the garment's own
+   * label and what PDT quotes back when re-ordering — a colour name and a size
+   * are not enough to identify a garment in a warehouse.
+   */
+  sku: string | null;
   colourName: string | null;
   size: string | null;
   quantity: number;
@@ -171,6 +177,7 @@ export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
       productName: products.name,
       colourName: productVariants.colourName,
       size: productVariants.size,
+      sku: productVariants.sku,
       stockQty: productVariants.stockQty,
       /*
        * What earlier orders have already claimed of this variant.
@@ -218,6 +225,7 @@ export async function listPackQueue(limit = 60): Promise<PackOrder[]> {
       productName: l.productName,
       colourName: l.colourName,
       size: l.size,
+      sku: l.sku,
       quantity: l.quantity,
       logoPlacement: l.logoPlacement,
       logoMethod: l.logoMethod,
